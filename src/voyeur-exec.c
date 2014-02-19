@@ -3,14 +3,9 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include "dyld.h"
 #include "env.h"
 #include "net.h"
-
-// From dyld-interposing.h:
-#define DYLD_INTERPOSE(_replacment,_replacee) \
-  __attribute__((used)) static struct{ const void* replacment; const void* replacee; } _interpose_##_replacee \
-  __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long)&_replacment, (const void*)(unsigned long)&_replacee }; 
-
 
 //typedef int (*execve_fptr_t)(const char*, char* const[], char* const []);
 

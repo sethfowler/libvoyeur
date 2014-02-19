@@ -4,14 +4,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "dyld.h"
 #include "env.h"
 #include "net.h"
-
-// From dyld-interposing.h:
-#define DYLD_INTERPOSE(_replacment,_replacee) \
-  __attribute__((used)) static struct{ const void* replacment; const void* replacee; } _interpose_##_replacee \
-  __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long)&_replacment, (const void*)(unsigned long)&_replacee }; 
-
 
 //typedef int (*open_fptr_t)(const char*, int, ...);
 //static open_fptr_t voyeur_open_next = NULL; // Still need this for Linux...
