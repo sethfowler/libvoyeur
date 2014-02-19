@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 #include "net.h"
@@ -136,4 +138,53 @@ int voyeur_read_string(int fd, char** val, size_t maxlen)
 
   (*val)[len] = '\0';
   return 0;
+}
+
+int create_server_socket(struct sockaddr_un* sockinfo)
+{
+  // Configure a unix domain socket at a temporary path.
+  memset(sockinfo, 0, sizeof(struct sockaddr_un));
+  sockinfo->sun_family = AF_UNIX;
+  strncpy(sockinfo->sun_path,
+          "/tmp/voyeur-socket-XXXXXXXXX",
+          sizeof(sockinfo->sun_path) - 1);
+  mktemp(sockinfo->sun_path);
+  unlink(sockinfo->sun_path);
+
+  // Start the server.
+  int server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (bind(server_sock,
+           (struct sockaddr*) sockinfo,
+           sizeof(struct sockaddr_un)) < 0) {
+    perror("bind");
+    exit(EXIT_FAILURE);
+  }
+  if (listen(server_sock, 5) < 0) {
+    perror("listen");
+    exit(EXIT_FAILURE);
+  }
+
+  return server_sock;
+}
+
+int create_client_socket(const char* sockpath)
+{
+  struct sockaddr_un sockinfo;
+
+  memset(&sockinfo, 0, sizeof(struct sockaddr_un));
+  sockinfo.sun_family = AF_UNIX;
+  strncpy(sockinfo.sun_path,
+          sockpath,
+          sizeof(sockinfo.sun_path) - 1);
+
+  // Connect to the server.
+  int client_sock = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (connect(client_sock,
+              (struct sockaddr*) &sockinfo,
+              sizeof(struct sockaddr_un)) < 0) {
+    perror("connect");
+    exit(EXIT_FAILURE);
+  }
+  
+  return client_sock;
 }

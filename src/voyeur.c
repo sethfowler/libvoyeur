@@ -32,33 +32,6 @@ void voyeur_add_exec_interest(voyeur_context_t ctx,
   ((voyeur_context*) ctx)->exec_cb = callback;
 }
 
-int create_server_socket(struct sockaddr_un* sockinfo)
-{
-  // Configure a unix domain socket at a temporary path.
-  memset(sockinfo, 0, sizeof(struct sockaddr_un));
-  sockinfo->sun_family = AF_UNIX;
-  strncpy(sockinfo->sun_path,
-          "/tmp/voyeur-socket-XXXXXXXXX",
-          sizeof(sockinfo->sun_path) - 1);
-  mktemp(sockinfo->sun_path);
-  unlink(sockinfo->sun_path);
-
-  // Start the server.
-  int server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (bind(server_sock,
-           (struct sockaddr*) sockinfo,
-           sizeof(struct sockaddr_un)) < 0) {
-    perror("bind");
-    exit(EXIT_FAILURE);
-  }
-  if (listen(server_sock, 5) < 0) {
-    perror("listen");
-    exit(EXIT_FAILURE);
-  }
-
-  return server_sock;
-}
-
 typedef struct {
   pid_t child_pid;
   int child_pipe_input;
@@ -262,8 +235,9 @@ int voyeur_observe(voyeur_context_t ctx,
   struct sockaddr_un sockinfo;
   voyeur_context* context = (voyeur_context*) ctx;
 
-  // Prepare the server. We need to do this in advance so we can
-  // include the socket path in the environment variables.
+  // Prepare the server. We need to do this in advance both to avoid
+  // racing and so that so we can include the socket path in the
+  // environment variables.
   int server_sock = create_server_socket(&sockinfo);
   
   pid_t child_pid;
@@ -282,7 +256,6 @@ int voyeur_observe(voyeur_context_t ctx,
     // Clean up the socket file.
     if (unlink(sockinfo.sun_path) < 0) {
       perror("unlink");
-      printf("Was trying to unlink %s\n", sockinfo.sun_path);
       exit(EXIT_FAILURE);
     }
 

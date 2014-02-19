@@ -3,12 +3,6 @@
 #include <stdio.h>
 #include <unistd.h>
 
-// FOR NETWORK
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-// FOR NETWORK
-
 #include "env.h"
 #include "net.h"
 
@@ -22,30 +16,6 @@ typedef int (*execve_fptr_t)(const char*, char* const[], char* const []);
 static char voyeur_execve_initialized = 0;
 //static execve_fptr_t voyeur_execve_next = NULL; // Still need this for Linux...
 static const char* voyeur_execve_sockpath = NULL;
-static int voyeur_execve_sock = 0;
-
-int create_client_socket(const char* sockpath)
-{
-  struct sockaddr_un sockinfo;
-
-  // Configure a unix domain socket at a temporary path.
-  memset(&sockinfo, 0, sizeof(struct sockaddr_un));
-  sockinfo.sun_family = AF_UNIX;
-  strncpy(sockinfo.sun_path,
-          sockpath,
-          sizeof(sockinfo.sun_path) - 1);
-
-  // Connect to the server.
-  int client_sock = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (connect(client_sock,
-              (struct sockaddr*) &sockinfo,
-              sizeof(struct sockaddr_un)) < 0) {
-    perror("connect");
-    exit(EXIT_FAILURE);
-  }
-  
-  return client_sock;
-}
 
 int voyeur_execve(const char* path, char* const argv[], char* const envp[]);
 DYLD_INTERPOSE(voyeur_execve, execve)
@@ -59,11 +29,12 @@ int voyeur_execve(const char* path, char* const argv[], char* const envp[])
     else
       printf("LIBVOYEUR_SOCKET = %s\n", voyeur_execve_sockpath);
 
-    voyeur_execve_sock = create_client_socket(voyeur_execve_sockpath);
     //voyeur_execve_next = (execve_fptr_t) dlsym(RTLD_NEXT, "execve"); // Linux...
   }
   
   // Write the event to the socket.
+  int voyeur_execve_sock = create_client_socket(voyeur_execve_sockpath);
+
   voyeur_write_event_type(voyeur_execve_sock, VOYEUR_EVENT_EXEC);
   voyeur_write_string(voyeur_execve_sock, path, 0);
 
@@ -84,6 +55,8 @@ int voyeur_execve(const char* path, char* const argv[], char* const envp[])
   for (int i = 0 ; i < envc ; ++i) {
     voyeur_write_string(voyeur_execve_sock, envp[i], 0);
   }
+
+  close(voyeur_execve_sock);
 
   // Add libvoyeur-specific environment variables.
   char** newenvp = augment_environment(envp, voyeur_execve_sockpath);
