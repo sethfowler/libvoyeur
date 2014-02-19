@@ -13,25 +13,21 @@
 
 
 //typedef int (*execve_fptr_t)(const char*, char* const[], char* const []);
-//static execve_fptr_t voyeur_exec_next = NULL; // Still need this for Linux...
 
-static char voyeur_exec_initialized = 0;
-static const char* voyeur_exec_sockpath = NULL;
+int voyeur_execve(const char* path, char* const argv[], char* const envp[]);
+DYLD_INTERPOSE(voyeur_execve, execve)
 
-int voyeur_exec(const char* path, char* const argv[], char* const envp[]);
-DYLD_INTERPOSE(voyeur_exec, execve)
-
-int voyeur_exec(const char* path, char* const argv[], char* const envp[])
+int voyeur_execve(const char* path, char* const argv[], char* const envp[])
 {
-  if (!voyeur_exec_initialized) {
-    voyeur_exec_sockpath = getenv("LIBVOYEUR_SOCKET");
-    if (voyeur_exec_sockpath == NULL)
-      printf("No LIBVOYEUR_SOCKET set\n");
-    else
-      printf("LIBVOYEUR_SOCKET = %s\n", voyeur_exec_sockpath);
+  // In the case of exec we don't bother caching anything, since exec
+  // will wipe out this whole process image anyway.
+  const char* voyeur_exec_sockpath = getenv("LIBVOYEUR_SOCKET");
+  if (voyeur_exec_sockpath == NULL)
+    printf("No LIBVOYEUR_SOCKET set\n");
+  else
+    printf("LIBVOYEUR_SOCKET = %s\n", voyeur_exec_sockpath);
 
-    //voyeur_exec_next = (execve_fptr_t) dlsym(RTLD_NEXT, "execve"); // Linux...
-  }
+  //execve_fptr_t voyeur_exec_next = (execve_fptr_t) dlsym(RTLD_NEXT, "execve"); // Linux...
   
   // Write the event to the socket.
   int voyeur_exec_sock = create_client_socket(voyeur_exec_sockpath);
@@ -57,6 +53,9 @@ int voyeur_exec(const char* path, char* const argv[], char* const envp[])
     voyeur_write_string(voyeur_exec_sock, envp[i], 0);
   }
 
+  // We might as well close the socket since there's no chance we'll
+  // ever be called a second time by the same process. (Even if the
+  // exec fails, generally the fork'd process will just bail.)
   close(voyeur_exec_sock);
 
   // Add libvoyeur-specific environment variables.
