@@ -12,9 +12,10 @@
   __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long)&_replacment, (const void*)(unsigned long)&_replacee }; 
 
 
-typedef int (*execve_fptr_t)(const char*, char* const[], char* const []);
-static char voyeur_exec_initialized = 0;
+//typedef int (*execve_fptr_t)(const char*, char* const[], char* const []);
 //static execve_fptr_t voyeur_exec_next = NULL; // Still need this for Linux...
+
+static char voyeur_exec_initialized = 0;
 static const char* voyeur_exec_sockpath = NULL;
 
 int voyeur_exec(const char* path, char* const argv[], char* const envp[]);

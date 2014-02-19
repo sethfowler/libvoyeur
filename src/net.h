@@ -21,7 +21,8 @@
 // Every read/write function returns 0 on success and -1 on error.
 
 typedef enum {
-  VOYEUR_EVENT_EXEC = 0
+  VOYEUR_EVENT_EXEC = 0,
+  VOYEUR_EVENT_OPEN
 } voyeur_event_type;
 
 // Reader and writer for event types.
