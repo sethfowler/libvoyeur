@@ -4,7 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <voyeur/net.h>
+#include "net.h"
 
 int do_write(int fd, void* buf, size_t buf_size)
 {

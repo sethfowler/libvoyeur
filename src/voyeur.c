@@ -8,7 +8,8 @@
 #include <unistd.h>
 
 #include <voyeur.h>
-#include <voyeur/net.h>
+#include "env.h"
+#include "net.h"
 
 typedef struct {
   voyeur_exec_callback exec_cb;
@@ -29,37 +30,6 @@ void voyeur_add_exec_interest(voyeur_context_t ctx,
                               voyeur_exec_callback callback)
 {
   ((voyeur_context*) ctx)->exec_cb = callback;
-}
-
-char** augment_environment(char* const* envp,
-                           char* sockpath,
-                           char** dyld_insert_libraries_env,
-                           char** libvoyeur_socket_env)
-{
-  // Determine the size of the original environment.
-  // TODO: Check if DYLD_INSERT_LIBRARIES already exists.
-  unsigned envlen = 0;
-  for ( ; envp[envlen] != NULL ; ++envlen);
-
-  // Allocate the new environment variables and store in the context
-  // to make it possible to free them later.
-  *dyld_insert_libraries_env = malloc(sizeof(char) * 1024);
-  strlcpy(*dyld_insert_libraries_env, "DYLD_INSERT_LIBRARIES=", 1024);
-  strlcat(*dyld_insert_libraries_env, "libvoyeur-execve.dylib", 1024);
-
-  *libvoyeur_socket_env = malloc(sizeof(char) * 1024);
-  strlcpy(*libvoyeur_socket_env, "LIBVOYEUR_SOCKET=", 1024);
-  strlcat(*libvoyeur_socket_env, sockpath, 1024);
-
-  // Allocate a new environment, including additional space for the 2
-  // extra environment variables we'll add and a terminating NULL.
-  char** newenvp = malloc(sizeof(char*) * (envlen + 3));
-  memcpy(newenvp, envp, sizeof(char*) * envlen);
-  newenvp[envlen] = *dyld_insert_libraries_env;
-  newenvp[envlen + 1] = *libvoyeur_socket_env;
-  newenvp[envlen + 2] = NULL;
-
-  return newenvp;
 }
 
 int create_server_socket(struct sockaddr_un* sockinfo)
@@ -153,7 +123,7 @@ int accept_connection(int server_sock)
     exit(EXIT_FAILURE);
   }
 
-  printf("Client connected.\n");
+  printf("Client %d connected.\n", client_sock);
   
   return client_sock;
 }
@@ -253,11 +223,13 @@ int run_server(voyeur_context* context,
         } else if (fd == child_pipe_output) {
           child_exited = 1;
           voyeur_read_int(fd, &child_status);
+          close(fd);
           FD_CLR(fd, &active_fd_set);
         } else {
           // Got a voyeur event; dispatch to the appropriate handler.
           voyeur_event_type type;
           if (voyeur_read_event_type(fd, &type) < 0) {
+            printf("Client %d disconnected.\n", fd);
             close(fd);
             FD_CLR(fd, &active_fd_set);
           } else if (type == VOYEUR_EVENT_EXEC) {
@@ -294,25 +266,15 @@ int voyeur_observe(voyeur_context_t ctx,
   // include the socket path in the environment variables.
   int server_sock = create_server_socket(&sockinfo);
   
-  // Add libvoyeur-specific environment variables.
-  // We return some of the environment variables so we can free them later.
-  char* libvoyeur_socket_env;
-  char* dyld_insert_libraries_env;
-  char** newenvp = augment_environment(envp,
-                                       sockinfo.sun_path,
-                                       &libvoyeur_socket_env,
-                                       &dyld_insert_libraries_env);
-
   pid_t child_pid;
-  if ((child_pid = vfork()) == 0) {
-    run_child(path, argv, newenvp);
-    return 0;  // Never reached.
-  } else {
-    // We're done with the environment variables, so free them.
-    free(newenvp);
-    free(libvoyeur_socket_env);
-    free(dyld_insert_libraries_env);
+  if ((child_pid = fork()) == 0) {
+    // Add libvoyeur-specific environment variables.
+    char** newenvp = augment_environment(envp, sockinfo.sun_path);
 
+    // Run the child process. This will never return.
+    run_child(path, argv, newenvp);
+    return 0;
+  } else {
     // Run the server.
     int child_pipe_output = start_waitpid_thread(child_pid);
     int res = run_server(context, server_sock, child_pipe_output);

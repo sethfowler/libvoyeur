@@ -9,7 +9,8 @@
 #include <sys/un.h>
 // FOR NETWORK
 
-#include <voyeur/net.h>
+#include "env.h"
+#include "net.h"
 
 // From dyld-interposing.h:
 #define DYLD_INTERPOSE(_replacment,_replacee) \
@@ -20,6 +21,7 @@
 typedef int (*execve_fptr_t)(const char*, char* const[], char* const []);
 static char voyeur_execve_initialized = 0;
 //static execve_fptr_t voyeur_execve_next = NULL; // Still need this for Linux...
+static const char* voyeur_execve_sockpath = NULL;
 static int voyeur_execve_sock = 0;
 
 int create_client_socket(const char* sockpath)
@@ -51,11 +53,13 @@ DYLD_INTERPOSE(voyeur_execve, execve)
 int voyeur_execve(const char* path, char* const argv[], char* const envp[])
 {
   if (!voyeur_execve_initialized) {
-    const char* lvsocket = getenv("LIBVOYEUR_SOCKET");
-    if (lvsocket == NULL) printf("No LIBVOYEUR_SOCKET set\n");
-    else                  printf("LIBVOYEUR_SOCKET = %s\n", lvsocket);
+    voyeur_execve_sockpath = getenv("LIBVOYEUR_SOCKET");
+    if (voyeur_execve_sockpath == NULL)
+      printf("No LIBVOYEUR_SOCKET set\n");
+    else
+      printf("LIBVOYEUR_SOCKET = %s\n", voyeur_execve_sockpath);
 
-    voyeur_execve_sock = create_client_socket(lvsocket);
+    voyeur_execve_sock = create_client_socket(voyeur_execve_sockpath);
     //voyeur_execve_next = (execve_fptr_t) dlsym(RTLD_NEXT, "execve"); // Linux...
   }
   
@@ -81,7 +85,10 @@ int voyeur_execve(const char* path, char* const argv[], char* const envp[])
     voyeur_write_string(voyeur_execve_sock, envp[i], 0);
   }
 
+  // Add libvoyeur-specific environment variables.
+  char** newenvp = augment_environment(envp, voyeur_execve_sockpath);
+
   // Pass through the call to the real execve.
-  //return voyeur_execve_next(path, argv, envp);  // Linux...
-  return execve(path, argv, envp);
+  //return voyeur_execve_next(path, argv, newenvp);  // Linux...
+  return execve(path, argv, newenvp);
 }
