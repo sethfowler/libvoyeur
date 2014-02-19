@@ -42,8 +42,7 @@ char** augment_environment(char* const* envp,
   for ( ; envp[envlen] != NULL ; ++envlen);
 
   // Allocate the new environment variables and store in the context
-  // to make it possible to free them later. We don't need to do this
-  // for DYLD_FORCE_FLAT_NAMESPACE since it's a compile-time constant.
+  // to make it possible to free them later.
   *dyld_insert_libraries_env = malloc(sizeof(char) * 1024);
   strlcpy(*dyld_insert_libraries_env, "DYLD_INSERT_LIBRARIES=", 1024);
   strlcat(*dyld_insert_libraries_env, "libvoyeur-execve.dylib", 1024);
@@ -52,35 +51,40 @@ char** augment_environment(char* const* envp,
   strlcpy(*libvoyeur_socket_env, "LIBVOYEUR_SOCKET=", 1024);
   strlcat(*libvoyeur_socket_env, sockpath, 1024);
 
-  // Allocate a new environment, including additional space for the 3
+  // Allocate a new environment, including additional space for the 2
   // extra environment variables we'll add and a terminating NULL.
-  char** newenvp = malloc(sizeof(char*) * (envlen + 4));
+  char** newenvp = malloc(sizeof(char*) * (envlen + 3));
   memcpy(newenvp, envp, sizeof(char*) * envlen);
-  newenvp[envlen] = "DYLD_FORCE_FLAT_NAMESPACE=1";
-  newenvp[envlen + 1] = *dyld_insert_libraries_env;
-  newenvp[envlen + 2] = *libvoyeur_socket_env;
-  newenvp[envlen + 3] = NULL;
+  newenvp[envlen] = *dyld_insert_libraries_env;
+  newenvp[envlen + 1] = *libvoyeur_socket_env;
+  newenvp[envlen + 2] = NULL;
 
   return newenvp;
 }
 
 int create_server_socket(struct sockaddr_un* sockinfo)
 {
-  int server_sock;
-  socklen_t socklen;
-
   // Configure a unix domain socket at a temporary path.
+  memset(sockinfo, 0, sizeof(struct sockaddr_un));
   sockinfo->sun_family = AF_UNIX;
-  strcpy(sockinfo->sun_path, "/tmp/voyeur-socket-XXXXXXXXX");
+  strncpy(sockinfo->sun_path,
+          "/tmp/voyeur-socket-XXXXXXXXX",
+          sizeof(sockinfo->sun_path) - 1);
   mktemp(sockinfo->sun_path);
   unlink(sockinfo->sun_path);
-  socklen = (socklen_t) (strlen(sockinfo->sun_path) +
-                         sizeof(sockinfo->sun_family));
 
   // Start the server.
-  server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
-  bind(server_sock, (struct sockaddr *)sockinfo, socklen);
-  listen(server_sock, 5);
+  int server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (bind(server_sock,
+           (struct sockaddr*) sockinfo,
+           sizeof(struct sockaddr_un)) < 0) {
+    perror("bind");
+    exit(EXIT_FAILURE);
+  }
+  if (listen(server_sock, 5) < 0) {
+    perror("listen");
+    exit(EXIT_FAILURE);
+  }
 
   return server_sock;
 }
@@ -249,7 +253,7 @@ int run_server(voyeur_context* context,
         } else if (fd == child_pipe_output) {
           child_exited = 1;
           voyeur_read_int(fd, &child_status);
-          FD_CLR(child_pipe_output, &active_fd_set);
+          FD_CLR(fd, &active_fd_set);
         } else {
           // Got a voyeur event; dispatch to the appropriate handler.
           voyeur_event_type type;
@@ -267,6 +271,8 @@ int run_server(voyeur_context* context,
       }
     }
   }
+
+  close(server_sock);
   
   if (WIFEXITED(child_status)) {
     return WEXITSTATUS(child_status);
@@ -307,7 +313,17 @@ int voyeur_observe(voyeur_context_t ctx,
     free(libvoyeur_socket_env);
     free(dyld_insert_libraries_env);
 
+    // Run the server.
     int child_pipe_output = start_waitpid_thread(child_pid);
-    return run_server(context, server_sock, child_pipe_output);
+    int res = run_server(context, server_sock, child_pipe_output);
+
+    // Clean up the socket file.
+    if (unlink(sockinfo.sun_path) < 0) {
+      perror("unlink");
+      printf("Was trying to unlink %s\n", sockinfo.sun_path);
+      exit(EXIT_FAILURE);
+    }
+
+    return res;
   }
 }

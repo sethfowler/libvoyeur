@@ -1,6 +1,7 @@
 #include <dlfcn.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 
 // FOR NETWORK
 #include <string.h>
@@ -10,26 +11,33 @@
 
 #include <voyeur/net.h>
 
+// From dyld-interposing.h:
+#define DYLD_INTERPOSE(_replacment,_replacee) \
+  __attribute__((used)) static struct{ const void* replacment; const void* replacee; } _interpose_##_replacee \
+  __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long)&_replacment, (const void*)(unsigned long)&_replacee }; 
+
+
 typedef int (*execve_fptr_t)(const char*, char* const[], char* const []);
 static char voyeur_execve_initialized = 0;
-static execve_fptr_t voyeur_execve_next = NULL;
+//static execve_fptr_t voyeur_execve_next = NULL; // Still need this for Linux...
 static int voyeur_execve_sock = 0;
 
 int create_client_socket(const char* sockpath)
 {
-  int client_sock;
   struct sockaddr_un sockinfo;
-  socklen_t socklen;
 
   // Configure a unix domain socket at a temporary path.
+  memset(&sockinfo, 0, sizeof(struct sockaddr_un));
   sockinfo.sun_family = AF_UNIX;
-  strcpy(sockinfo.sun_path, sockpath);
-  socklen = (socklen_t) (strlen(sockinfo.sun_path) +
-                         sizeof(sockinfo.sun_family));
+  strncpy(sockinfo.sun_path,
+          sockpath,
+          sizeof(sockinfo.sun_path) - 1);
 
   // Connect to the server.
-  client_sock = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (connect(client_sock, (struct sockaddr*) &sockinfo, socklen) < 0) {
+  int client_sock = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (connect(client_sock,
+              (struct sockaddr*) &sockinfo,
+              sizeof(struct sockaddr_un)) < 0) {
     perror("connect");
     exit(EXIT_FAILURE);
   }
@@ -37,7 +45,10 @@ int create_client_socket(const char* sockpath)
   return client_sock;
 }
 
-int execve(const char* path, char* const argv[], char* const envp[])
+int voyeur_execve(const char* path, char* const argv[], char* const envp[]);
+DYLD_INTERPOSE(voyeur_execve, execve)
+
+int voyeur_execve(const char* path, char* const argv[], char* const envp[])
 {
   if (!voyeur_execve_initialized) {
     const char* lvsocket = getenv("LIBVOYEUR_SOCKET");
@@ -45,7 +56,7 @@ int execve(const char* path, char* const argv[], char* const envp[])
     else                  printf("LIBVOYEUR_SOCKET = %s\n", lvsocket);
 
     voyeur_execve_sock = create_client_socket(lvsocket);
-    voyeur_execve_next = (execve_fptr_t) dlsym(RTLD_NEXT, "execve");
+    //voyeur_execve_next = (execve_fptr_t) dlsym(RTLD_NEXT, "execve"); // Linux...
   }
   
   // Write the event to the socket.
@@ -71,5 +82,6 @@ int execve(const char* path, char* const argv[], char* const envp[])
   }
 
   // Pass through the call to the real execve.
-  return voyeur_execve_next(path, argv, envp);
+  //return voyeur_execve_next(path, argv, envp);  // Linux...
+  return execve(path, argv, envp);
 }
