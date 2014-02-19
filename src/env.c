@@ -14,7 +14,7 @@ char** augment_environment(char* const* envp, const char* sockpath)
   // to make it possible to free them later.
   char* dyld_insert_libraries_env = malloc(sizeof(char) * 1024);
   strlcpy(dyld_insert_libraries_env, "DYLD_INSERT_LIBRARIES=", 1024);
-  strlcat(dyld_insert_libraries_env, "libvoyeur-execve.dylib", 1024);
+  strlcat(dyld_insert_libraries_env, "libvoyeur-exec.dylib", 1024);
 
   char* libvoyeur_socket_env = malloc(sizeof(char) * 1024);
   strlcpy(libvoyeur_socket_env, "LIBVOYEUR_SOCKET=", 1024);

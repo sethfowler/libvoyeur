@@ -7,9 +7,9 @@ Currently libvoyeur is compatible with Mac OS X, but Linux compatibility is anti
 
 The following system calls will be observable in the near future:
 
-- Process creation with `exec*` and `waitpid`
+- Process creation with `exec*`
 - File access with `open` and `close`
-- Socket access with `socket` and `shutdown`
+- Socket access with `accept`, `bind`, `connect`, and `shutdown`
 
 Currently only `exec*` is implemented.
 

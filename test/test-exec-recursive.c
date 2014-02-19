@@ -3,8 +3,8 @@
 
 pid_t run_test()
 {
-  char* path   = "./test-execve";
-  char* argv[] = { path, "recursive execve", NULL };
+  char* path   = "./test-exec";
+  char* argv[] = { path, "recursive exec", NULL };
   char* envp[] = { "envvar=val2", NULL };
 
   pid_t pid;
@@ -19,7 +19,7 @@ pid_t run_test()
 
 int main(int argc, char** argv)
 {
-  // Start four child processes that will themselves call execve.
+  // Start four child processes that will themselves call exec.
   pid_t pid1 = run_test();
   pid_t pid2 = run_test();
   pid_t pid3 = run_test();

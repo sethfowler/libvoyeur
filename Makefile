@@ -1,7 +1,7 @@
 CFLAGS=-I./include -g
 OUTDIR=build
-OUTPUTS=$(OUTDIR) $(OUTDIR)/libvoyeur.dylib $(OUTDIR)/libvoyeur-execve.dylib
-TESTS=$(OUTDIR)/voyeur-test $(OUTDIR)/test-execve $(OUTDIR)/test-execve-recursive
+OUTPUTS=$(OUTDIR) $(OUTDIR)/libvoyeur.dylib $(OUTDIR)/libvoyeur-exec.dylib
+TESTS=$(OUTDIR)/voyeur-test $(OUTDIR)/test-exec $(OUTDIR)/test-exec-recursive
 
 .PHONY: default clean tests
 
@@ -13,8 +13,8 @@ $(OUTDIR):
 $(OUTDIR)/libvoyeur.dylib: src/voyeur.c src/net.c src/env.c
 	clang $(CFLAGS) $^ -dynamiclib -install_name 'libvoyeur.dylib' -o $@
 
-$(OUTDIR)/libvoyeur-execve.dylib: src/voyeur-execve.c src/net.c src/env.c
-	clang $(CFLAGS) $^ -dynamiclib -flat_namespace -install_name 'libvoyeur-execve.dylib' -o $@
+$(OUTDIR)/libvoyeur-exec.dylib: src/voyeur-exec.c src/net.c src/env.c
+	clang $(CFLAGS) $^ -dynamiclib -flat_namespace -install_name 'libvoyeur-exec.dylib' -o $@
 
 check: $(OUTPUTS) $(TESTS)
 	cd $(OUTDIR) && ./voyeur-test
@@ -22,10 +22,10 @@ check: $(OUTPUTS) $(TESTS)
 $(OUTDIR)/voyeur-test: test/voyeur-test.c
 	clang $(CFLAGS) -L$(OUTDIR) -lvoyeur $^ -o $@
 
-$(OUTDIR)/test-execve: test/test-execve.c
+$(OUTDIR)/test-exec: test/test-exec.c
 	clang $(CFLAGS) $^ -o $@
 
-$(OUTDIR)/test-execve-recursive: test/test-execve-recursive.c
+$(OUTDIR)/test-exec-recursive: test/test-exec-recursive.c
 	clang $(CFLAGS) $^ -o $@
 
 clean:

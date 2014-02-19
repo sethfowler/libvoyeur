@@ -27,32 +27,32 @@ void exec_callback(const char* path,
     printf("env[%d] = %s\n", i, envp[i]);
 }
 
-void test_execve()
+void test_exec()
 {
   voyeur_context_t ctx = voyeur_context_create();
   voyeur_add_exec_interest(ctx, exec_callback);
 
-  char* path   = "./test-execve";
+  char* path   = "./test-exec";
   char* argv[] = { path, NULL };
   char* envp[] = { NULL };
 
-  print_test_header("execve");
+  print_test_header("exec");
   voyeur_observe(ctx, path, argv, envp);
   print_test_footer();
 
   voyeur_context_destroy(ctx);
 }
 
-void test_execve_recursive()
+void test_exec_recursive()
 {
   voyeur_context_t ctx = voyeur_context_create();
   voyeur_add_exec_interest(ctx, exec_callback);
 
-  char* path   = "./test-execve-recursive";
+  char* path   = "./test-exec-recursive";
   char* argv[] = { path, NULL };
   char* envp[] = { NULL };
 
-  print_test_header("execve-recursive");
+  print_test_header("exec-recursive");
   voyeur_observe(ctx, path, argv, envp);
   print_test_footer();
 
@@ -61,7 +61,7 @@ void test_execve_recursive()
 
 int main(int argc, char** argv)
 {
-  test_execve();
-  test_execve_recursive();
+  test_exec();
+  test_exec_recursive();
   return 0;
 }
