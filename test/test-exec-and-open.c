@@ -1,7 +1,13 @@
 #include <fcntl.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/wait.h>
 #include <unistd.h>
+
+#ifdef __linux__
+// For strlcpy/strlcat.
+#include <bsd/string.h>
+#endif
 
 void run_exec_test()
 {

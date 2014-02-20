@@ -143,6 +143,8 @@ int voyeur_read_string(int fd, char** val, size_t maxlen)
 int create_server_socket(struct sockaddr_un* sockinfo)
 {
   // Configure a unix domain socket at a temporary path.
+  // TODO: Switch to using mkdtemp and placing the socket
+  // inside this directory.
   memset(sockinfo, 0, sizeof(struct sockaddr_un));
   sockinfo->sun_family = AF_UNIX;
   strncpy(sockinfo->sun_path,

@@ -4,8 +4,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <sys/un.h>
 #include <unistd.h>
+
+#ifdef __linux__
+// For strlcpy/strlcat.
+#include <bsd/string.h>
+#endif
 
 #include <voyeur.h>
 #include "env.h"

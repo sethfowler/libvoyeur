@@ -1,44 +1,62 @@
+LIBNAMES=libvoyeur libvoyeur-exec libvoyeur-open
+TESTNAMES=test-exec test-exec-recursive test-open test-exec-and-open
+TESTHARNESSNAME=voyeur-test
+LIBNULLNAME=libnull
+
+CC=clang
 CFLAGS=-I./include -g
-OUTDIR=build
-OUTPUTS=$(OUTDIR) $(OUTDIR)/libvoyeur.dylib $(OUTDIR)/libvoyeur-exec.dylib $(OUTDIR)/libvoyeur-open.dylib
-TESTS=$(OUTDIR)/voyeur-test $(OUTDIR)/test-exec $(OUTDIR)/test-exec-recursive $(OUTDIR)/test-open $(OUTDIR)/test-exec-and-open $(OUTDIR)/libnull.dylib
 
-.PHONY: default clean tests
+UNAME := $(shell uname -s)
+ifeq ($(UNAME), Darwin)
+  LIBSUFFIX=dylib
+else
+  LIBSUFFIX=so
+  CFLAGS+=-fPIC -pthread -lbsd
+endif
 
-default: $(OUTPUTS)
+HEADERS=$(wildcard src/*.h) $(wildcard include/*.h)
+LIBSOURCES=$(wildcard src/*.c)
+LIBOBJECTS=$(patsubst src/%.c, build/%.o, $(LIBSOURCES))
+TESTSOURCES=$(wildcard test/*.c)
+TESTOBJECTS=$(patsubst test/%.c, build/%.o, $(TESTSOURCES))
+OBJECTS=$(LIBOBJECTS)
+LIBS=$(addprefix build/, $(addsuffix .$(LIBSUFFIX), $(LIBNAMES)))
+TESTS=$(addprefix build/, $(TESTNAMES))
+TESTHARNESS=$(addprefix build/, $(TESTHARNESSNAME))
+LIBNULL=$(addprefix build/, $(addsuffix .$(LIBSUFFIX), $(LIBNULLNAME)))
 
-$(OUTDIR):
+.PHONY: default check clean
+
+default: build $(LIBS)
+
+build:
 	mkdir -p $@
 
-$(OUTDIR)/libvoyeur.dylib: src/voyeur.c src/net.c src/env.c
-	clang $(CFLAGS) $^ -dynamiclib -install_name 'libvoyeur.dylib' -o $@
+$(OBJECTS): build/%.o : src/%.c $(HEADERS)
+	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/libvoyeur-exec.dylib: src/voyeur-exec.c src/net.c src/env.c
-	clang $(CFLAGS) $^ -dynamiclib -flat_namespace -install_name 'libvoyeur-exec.dylib' -o $@
+$(LIBS): build/lib%.$(LIBSUFFIX) : build/%.o build/net.o build/env.o
+ifeq ($(UNAME), Darwin)
+	$(CC) $(CFLAGS) $^ -dynamiclib -install_name lib$*.$(LIBSUFFIX) -o $@
+else
+	$(CC) $(CFLAGS) $^ -shared -Wl,-soname,lib$*.$(LIBSUFFIX) -o $@
+endif
 
-$(OUTDIR)/libvoyeur-open.dylib: src/voyeur-open.c src/net.c src/env.c
-	clang $(CFLAGS) $^ -dynamiclib -flat_namespace -install_name 'libvoyeur-open.dylib' -o $@
+check: default $(TESTHARNESS) $(TESTS) $(LIBNULL)
+	cd build && ./$(TESTHARNESSNAME)
 
-check: $(OUTPUTS) $(TESTS)
-	cd $(OUTDIR) && ./voyeur-test
+$(TESTHARNESS): build/% : test/%.c $(LIBS)
+	$(CC) $(CFLAGS) -Lbuild -lvoyeur -Wl,-rpath '-Wl,$$ORIGIN' $< -o $@
 
-$(OUTDIR)/voyeur-test: test/voyeur-test.c
-	clang $(CFLAGS) -L$(OUTDIR) -lvoyeur $^ -o $@
+$(TESTS): build/% : test/%.c $(LIBS)
+	$(CC) $(CFLAGS) $< -o $@
 
-$(OUTDIR)/test-exec: test/test-exec.c
-	clang $(CFLAGS) $^ -o $@
-
-$(OUTDIR)/test-exec-recursive: test/test-exec-recursive.c
-	clang $(CFLAGS) $^ -o $@
-
-$(OUTDIR)/test-open: test/test-open.c
-	clang $(CFLAGS) $^ -o $@
-
-$(OUTDIR)/test-exec-and-open: test/test-exec-and-open.c
-	clang $(CFLAGS) $^ -o $@
-
-$(OUTDIR)/libnull.dylib: test/libnull.c
-	clang $(CFLAGS) $^ -dynamiclib -install_name 'libnull.dylib' -o $@
+$(LIBNULL): build/%.$(LIBSUFFIX) : test/%.c
+ifeq ($(UNAME), Darwin)
+	$(CC) $(CFLAGS) $^ -dynamiclib -install_name $*.$(LIBSUFFIX) -o $@
+else
+	$(CC) $(CFLAGS) $^ -shared -Wl,-soname,$*.$(LIBSUFFIX) -o $@
+endif
 
 clean:
-	rm -rf $(OUTDIR)
+	rm -rf build

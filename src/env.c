@@ -2,6 +2,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef __linux__
+// For strlcpy/strlcat.
+#include <bsd/string.h>
+#endif
+
 #include "env.h"
 
 #define ENV_VAR_SIZE 2048

@@ -3,6 +3,11 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#ifdef __linux__
+// For strlcpy/strlcat.
+#include <bsd/string.h>
+#endif
+
 void run_test()
 {
   int fd;
