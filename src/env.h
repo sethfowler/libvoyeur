@@ -7,6 +7,8 @@
 // assumed that the caller is calling this function between calling
 // fork() and calling exec(), so the ownership of the allocated
 // memory is irrelevant.
-char** augment_environment(char* const* envp, const char* sockpath);
+char** voyeur_augment_environment(char* const* envp,
+                                  const char* voyeur_libs,
+                                  const char* sockpath);
 
 #endif

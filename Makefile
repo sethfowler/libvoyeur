@@ -1,7 +1,7 @@
 CFLAGS=-I./include -g
 OUTDIR=build
 OUTPUTS=$(OUTDIR) $(OUTDIR)/libvoyeur.dylib $(OUTDIR)/libvoyeur-exec.dylib $(OUTDIR)/libvoyeur-open.dylib
-TESTS=$(OUTDIR)/voyeur-test $(OUTDIR)/test-exec $(OUTDIR)/test-exec-recursive
+TESTS=$(OUTDIR)/voyeur-test $(OUTDIR)/test-exec $(OUTDIR)/test-exec-recursive $(OUTDIR)/test-open $(OUTDIR)/test-exec-and-open $(OUTDIR)/libnull.dylib
 
 .PHONY: default clean tests
 
@@ -30,6 +30,15 @@ $(OUTDIR)/test-exec: test/test-exec.c
 
 $(OUTDIR)/test-exec-recursive: test/test-exec-recursive.c
 	clang $(CFLAGS) $^ -o $@
+
+$(OUTDIR)/test-open: test/test-open.c
+	clang $(CFLAGS) $^ -o $@
+
+$(OUTDIR)/test-exec-and-open: test/test-exec-and-open.c
+	clang $(CFLAGS) $^ -o $@
+
+$(OUTDIR)/libnull.dylib: test/libnull.c
+	clang $(CFLAGS) $^ -dynamiclib -install_name 'libnull.dylib' -o $@
 
 clean:
 	rm -rf $(OUTDIR)

@@ -13,6 +13,10 @@
 
 typedef struct {
   voyeur_exec_callback exec_cb;
+  void* exec_userdata;
+
+  voyeur_open_callback open_cb;
+  void* open_userdata;
 } voyeur_context;
 
 voyeur_context_t voyeur_context_create()
@@ -26,10 +30,22 @@ void voyeur_context_destroy(voyeur_context_t ctx)
   free((voyeur_context*) ctx);
 }
 
-void voyeur_add_exec_interest(voyeur_context_t ctx,
-                              voyeur_exec_callback callback)
+void voyeur_observe_exec(voyeur_context_t ctx,
+                         voyeur_exec_callback callback,
+                         void* userdata)
 {
-  ((voyeur_context*) ctx)->exec_cb = callback;
+  voyeur_context* context = (voyeur_context*) ctx;
+  context->exec_cb = callback;
+  context->exec_userdata = userdata;
+}
+
+void voyeur_observe_open(voyeur_context_t ctx,
+                         voyeur_open_callback callback,
+                         void* userdata)
+{
+  voyeur_context* context = (voyeur_context*) ctx;
+  context->open_cb = callback;
+  context->open_userdata = userdata;
 }
 
 typedef struct {
@@ -151,7 +167,7 @@ void handle_exec(voyeur_context* context, int fd)
   // isn't present, so we can move on to the next event. In practice
   // that should never happen, so it's not worth worrying about.
   if (context->exec_cb) {
-    context->exec_cb(path, argv, envp);
+    context->exec_cb(path, argv, envp, context->exec_userdata);
   }
 
   // Free everything.
@@ -166,6 +182,41 @@ void handle_exec(voyeur_context* context, int fd)
     free(envp[i]);
   }
   free(envp);
+}
+
+void handle_open(voyeur_context* context, int fd)
+{
+  // Read the path.
+  char* path;
+  if (voyeur_read_string(fd, &path, 0) < 0) {
+    perror("read");
+    exit(EXIT_FAILURE);
+  }
+
+  // Read the flags.
+  int oflag;
+  if (voyeur_read_int(fd, &oflag) < 0) {
+    perror("read");
+    exit(EXIT_FAILURE);
+  }
+
+  // Read the mode.
+  int mode;
+  if (voyeur_read_int(fd, &mode) < 0) {
+    perror("read");
+    exit(EXIT_FAILURE);
+  }
+
+  // Invoke the callback, if there is one.
+  // Note that we always have to read the data, even if the callback
+  // isn't present, so we can move on to the next event. In practice
+  // that should never happen, so it's not worth worrying about.
+  if (context->open_cb) {
+    context->open_cb(path, oflag, (mode_t) mode, context->open_userdata);
+  }
+
+  // Free everything.
+  free(path);
 }
 
 int run_server(voyeur_context* context,
@@ -207,6 +258,8 @@ int run_server(voyeur_context* context,
             FD_CLR(fd, &active_fd_set);
           } else if (type == VOYEUR_EVENT_EXEC) {
             handle_exec(context, fd);
+          } else if (type == VOYEUR_EVENT_OPEN) {
+            handle_open(context, fd);
           } else {
             fprintf(stderr, "libvoyeur: got unknown event type %u\n",
                     (unsigned) type);
@@ -227,10 +280,31 @@ int run_server(voyeur_context* context,
   }
 }
 
-int voyeur_observe(voyeur_context_t ctx,
-                   const char* path,
-                   char* const argv[],
-                   char* const envp[])
+#define LIBS_SIZE 256
+
+char* requested_libs(voyeur_context* context)
+{
+  char* libs = calloc(1, LIBS_SIZE);
+  char prev = 0;
+  
+  if (context->exec_cb) {
+    strlcat(libs, "libvoyeur-exec.dylib", LIBS_SIZE);
+    prev = 1;
+  }
+
+  if (context->open_cb) {
+    if (prev) strlcat(libs, ":", LIBS_SIZE);
+    strlcat(libs, "libvoyeur-open.dylib", LIBS_SIZE);
+    prev = 1;
+  }
+
+  return libs;
+}
+
+int voyeur_exec(voyeur_context_t ctx,
+                const char* path,
+                char* const argv[],
+                char* const envp[])
 {
   struct sockaddr_un sockinfo;
   voyeur_context* context = (voyeur_context*) ctx;
@@ -243,7 +317,8 @@ int voyeur_observe(voyeur_context_t ctx,
   pid_t child_pid;
   if ((child_pid = fork()) == 0) {
     // Add libvoyeur-specific environment variables.
-    char** newenvp = augment_environment(envp, sockinfo.sun_path);
+    char* libs = requested_libs(context);
+    char** newenvp = voyeur_augment_environment(envp, libs, sockinfo.sun_path);
 
     // Run the child process. This will never return.
     run_child(path, argv, newenvp);

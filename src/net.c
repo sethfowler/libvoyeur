@@ -120,7 +120,7 @@ int voyeur_read_string(int fd, char** val, size_t maxlen)
   }
 
   if (maxlen == 0) {
-    *val = malloc(len * (sizeof(char) + 1));
+    *val = malloc(len + 1);
   } else if (maxlen <= len) {
     fprintf(stderr,
             "libvoyeur: string buffer of size %zu is too small for string of length %zu\n",

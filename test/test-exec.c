@@ -4,7 +4,7 @@ void run_test()
 {
   char* path   = "/bin/echo";
   char* argv[] = { path, "hello world", NULL };
-  char* envp[] = { NULL };
+  char* envp[] = { "DYLD_INSERT_LIBRARIES=libnull.dylib", NULL };
   execve(path, argv, envp);
 }
 
