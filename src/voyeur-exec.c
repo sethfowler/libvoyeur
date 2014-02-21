@@ -1,4 +1,4 @@
-#ifndef __darwin__
+#ifndef __APPLE__
 #define _GNU_SOURCE
 #endif
 

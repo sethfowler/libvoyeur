@@ -46,7 +46,11 @@ check: default $(TESTHARNESS) $(TESTS) $(LIBNULL)
 	cd build && ./$(TESTHARNESSNAME)
 
 $(TESTHARNESS): build/% : test/%.c $(LIBS)
+ifeq ($(UNAME), Darwin)
+	$(CC) $(CFLAGS) -Lbuild -lvoyeur $< -o $@
+else
 	$(CC) $(CFLAGS) -Lbuild -lvoyeur -Wl,-rpath '-Wl,$$ORIGIN' $< -o $@
+endif
 
 $(TESTS): build/% : test/%.c $(LIBS)
 	$(CC) $(CFLAGS) $< -o $@

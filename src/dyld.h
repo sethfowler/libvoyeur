@@ -3,7 +3,7 @@
 
 #include <dlfcn.h>
 
-#ifdef __darwin__
+#ifdef __APPLE__
 
 #define VOYEUR_FUNC(_foo) voyeur_##_foo
 #define VOYEUR_DECLARE_NEXT(_foo_t, _foo)

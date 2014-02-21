@@ -17,7 +17,7 @@
 #include "env.h"
 #include "net.h"
 
-#ifdef __darwin__
+#ifdef __APPLE__
 #define LIB_SUFFIX ".dylib"
 #else
 #define LIB_SUFFIX ".so"

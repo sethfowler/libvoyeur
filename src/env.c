@@ -9,7 +9,7 @@
 
 #include "env.h"
 
-#ifdef __darwin__
+#ifdef __APPLE__
 #define INSERT_LIBS "DYLD_INSERT_LIBRARIES="
 #else
 #define INSERT_LIBS "LD_PRELOAD="
