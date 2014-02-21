@@ -11,7 +11,7 @@ The following system calls will be observable in the near future:
 - File access with `open` and `close`
 - Socket access with `accept`, `bind`, `connect`, and `shutdown`
 
-Currently only `exec*` is implemented.
+Currently only `exec*`, `open`, and `close` are implemented.
 
 There is a significant performance cost to the observed process, because the details of the system calls are sent to the observing process over IPC. However, libvoyeur tries to be as efficient as possible: you only pay a performance penalty for the system calls that you actually want to observe.
 
