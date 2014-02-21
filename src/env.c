@@ -9,6 +9,12 @@
 
 #include "env.h"
 
+#ifdef __darwin__
+#define INSERT_LIBS "DYLD_INSERT_LIBRARIES="
+#else
+#define INSERT_LIBS "LD_PRELOAD="
+#endif
+
 #define ENV_VAR_SIZE 2048
 
 char** voyeur_augment_environment(char* const* envp,
@@ -19,12 +25,10 @@ char** voyeur_augment_environment(char* const* envp,
   unsigned envlen = 0;
   char* existing_dyld_insert = NULL;
   for ( ; envp[envlen] != NULL ; ++envlen) {
-    printf("Comparing [%s] and [%s]\n", envp[envlen], "DYLD_INSERT_LIBRARIES=");
-    if (strncmp(envp[envlen],
-                "DYLD_INSERT_LIBRARIES=",
-                sizeof("DYLD_INSERT_LIBRARIES=") - 1) == 0) {
+    printf("Comparing [%s] and [%s]\n", envp[envlen], INSERT_LIBS);
+    if (strncmp(envp[envlen], INSERT_LIBS, sizeof(INSERT_LIBS) - 1) == 0) {
       existing_dyld_insert = envp[envlen] +
-                             sizeof("DYLD_INSERT_LIBRARIES=") - 1;
+                             sizeof(INSERT_LIBS) - 1;
     }
   }
 
@@ -32,7 +36,7 @@ char** voyeur_augment_environment(char* const* envp,
   // to make it possible to free them later.
   // TODO: Change the comment once I decide what to do here.
   char* dyld_insert_libraries_env = malloc(ENV_VAR_SIZE);
-  strlcpy(dyld_insert_libraries_env, "DYLD_INSERT_LIBRARIES=", ENV_VAR_SIZE);
+  strlcpy(dyld_insert_libraries_env, INSERT_LIBS, ENV_VAR_SIZE);
   strlcat(dyld_insert_libraries_env, voyeur_libs, ENV_VAR_SIZE);
   if (existing_dyld_insert) {
     strlcat(dyld_insert_libraries_env, ":", ENV_VAR_SIZE);
@@ -50,7 +54,7 @@ char** voyeur_augment_environment(char* const* envp,
 
   // Allocate a new environment, including additional space for the 3
   // extra environment variables we'll add and a terminating NULL.
-  char** newenvp = malloc(sizeof(char*) * (envlen + 3));
+  char** newenvp = malloc(sizeof(char*) * (envlen + 4));
   memcpy(newenvp, envp, sizeof(char*) * envlen);
   newenvp[envlen]     = dyld_insert_libraries_env;
   newenvp[envlen + 1] = libvoyeur_libs_env;

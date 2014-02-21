@@ -17,6 +17,12 @@
 #include "env.h"
 #include "net.h"
 
+#ifdef __darwin__
+#define LIB_SUFFIX ".dylib"
+#else
+#define LIB_SUFFIX ".so"
+#endif
+
 typedef struct {
   voyeur_exec_callback exec_cb;
   void* exec_userdata;
@@ -287,22 +293,33 @@ int run_server(voyeur_context* context,
 }
 
 #define LIBS_SIZE 256
+#define LIB_PREFIX "/home/mfowler/Code/libvoyeur/build/"
 
 char* requested_libs(voyeur_context* context)
 {
   char* libs = calloc(1, LIBS_SIZE);
   char prev = 0;
   
+  // TODO: This should be relative to the library location, not the current
+  // directory. This is just a quick hack.
+  char* cwd = getcwd(NULL, 0);
+
   if (context->exec_cb) {
-    strlcat(libs, "libvoyeur-exec.dylib", LIBS_SIZE);
+    strlcat(libs, cwd, LIBS_SIZE);
+    strlcat(libs, "/", LIBS_SIZE);
+    strlcat(libs, "libvoyeur-exec" LIB_SUFFIX, LIBS_SIZE);
     prev = 1;
   }
 
   if (context->open_cb) {
     if (prev) strlcat(libs, ":", LIBS_SIZE);
-    strlcat(libs, "libvoyeur-open.dylib", LIBS_SIZE);
+    strlcat(libs, cwd, LIBS_SIZE);
+    strlcat(libs, "/", LIBS_SIZE);
+    strlcat(libs, "libvoyeur-open" LIB_SUFFIX, LIBS_SIZE);
     prev = 1;
   }
+
+  free(cwd);
 
   return libs;
 }

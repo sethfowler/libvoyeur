@@ -33,6 +33,23 @@ void exec_callback(const char* path,
   *result = 1;
 }
 
+void exec_recursive_callback(const char* path,
+                             char* const argv[],
+                             char* const envp[],
+                             void* userdata)
+{
+  printf("exec_callback called for path [%s]\n", path);
+
+  for (int i = 0 ; argv[i] ; ++i)
+    printf("arg[%d] = %s\n", i, argv[i]);
+
+  for (int i = 0 ; envp[i] ; ++i)
+    printf("env[%d] = %s\n", i, envp[i]);
+
+  unsigned* result = (unsigned*) userdata;
+  *result += 1;
+}
+
 void open_callback(const char* path,
                    int oflag,
                    mode_t mode,
@@ -64,9 +81,9 @@ void test_exec()
 
 void test_exec_recursive()
 {
-  char result = 0;
+  unsigned result = 0;
   voyeur_context_t ctx = voyeur_context_create();
-  voyeur_observe_exec(ctx, exec_callback, (void*) &result);
+  voyeur_observe_exec(ctx, exec_recursive_callback, (void*) &result);
 
   char* path   = "./test-exec-recursive";
   char* argv[] = { path, NULL };
@@ -74,7 +91,7 @@ void test_exec_recursive()
 
   print_test_header("exec-recursive");
   voyeur_exec(ctx, path, argv, envp);
-  print_test_footer(result);
+  print_test_footer(result == 8);
 
   voyeur_context_destroy(ctx);
 }

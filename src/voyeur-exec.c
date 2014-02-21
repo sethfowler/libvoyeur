@@ -1,4 +1,7 @@
-#include <dlfcn.h>
+#ifndef __darwin__
+#define _GNU_SOURCE
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -7,12 +10,12 @@
 #include "env.h"
 #include "net.h"
 
-//typedef int (*execve_fptr_t)(const char*, char* const[], char* const []);
+typedef int (*execve_fptr_t)(const char*, char* const[], char* const []);
 
-int voyeur_execve(const char* path, char* const argv[], char* const envp[]);
-DYLD_INTERPOSE(voyeur_execve, execve)
+int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[]);
+VOYEUR_INTERPOSE(execve)
 
-int voyeur_execve(const char* path, char* const argv[], char* const envp[])
+int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[])
 {
   // In the case of exec we don't bother caching anything, since exec
   // will wipe out this whole process image anyway.
@@ -28,8 +31,6 @@ int voyeur_execve(const char* path, char* const argv[], char* const envp[])
   else
     printf("LIBVOYEUR_LIBS = %s\n", libs);
 
-  //execve_fptr_t voyeur_exec_next = (execve_fptr_t) dlsym(RTLD_NEXT, "execve"); // Linux...
-  
   // Write the event to the socket.
   int sock = create_client_socket(sockpath);
 
@@ -63,6 +64,7 @@ int voyeur_execve(const char* path, char* const argv[], char* const envp[])
   char** newenvp = voyeur_augment_environment(envp, libs, sockpath);
 
   // Pass through the call to the real execve.
-  //return voyeur_exec_next(path, argv, newenvp);  // Linux...
-  return execve(path, argv, newenvp);
+  VOYEUR_DECLARE_NEXT(execve_fptr_t, execve);
+  VOYEUR_LOOKUP_NEXT(execve_fptr_t, execve);
+  return VOYEUR_CALL_NEXT(execve, path, argv, newenvp);
 }

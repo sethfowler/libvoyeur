@@ -39,7 +39,7 @@ $(LIBS): build/lib%.$(LIBSUFFIX) : build/%.o build/net.o build/env.o
 ifeq ($(UNAME), Darwin)
 	$(CC) $(CFLAGS) $^ -dynamiclib -install_name lib$*.$(LIBSUFFIX) -o $@
 else
-	$(CC) $(CFLAGS) $^ -shared -Wl,-soname,lib$*.$(LIBSUFFIX) -o $@
+	$(CC) $(CFLAGS) $^ -shared -Wl,-soname,lib$*.$(LIBSUFFIX) -o $@ -ldl
 endif
 
 check: default $(TESTHARNESS) $(TESTS) $(LIBNULL)

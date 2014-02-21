@@ -1,4 +1,7 @@
-#include <dlfcn.h>
+#ifndef __darwin__
+#define _GNU_SOURCE
+#endif
+
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -8,17 +11,17 @@
 #include "env.h"
 #include "net.h"
 
-//typedef int (*open_fptr_t)(const char*, int, ...);
-//static open_fptr_t voyeur_open_next = NULL; // Still need this for Linux...
+typedef int (*open_fptr_t)(const char*, int, ...);
+VOYEUR_STATIC_DECLARE_NEXT(open_fptr_t, open)
 
 static char voyeur_open_initialized = 0;
 static const char* voyeur_open_sockpath = NULL;
 static int voyeur_open_sock = 0;
 
-int voyeur_open(const char* path, int oflag, ...);
-DYLD_INTERPOSE(voyeur_open, open)
+int VOYEUR_FUNC(open)(const char* path, int oflag, ...);
+VOYEUR_INTERPOSE(open)
 
-int voyeur_open(const char* path, int oflag, ...)
+int VOYEUR_FUNC(open)(const char* path, int oflag, ...)
 {
   if (!voyeur_open_initialized) {
     voyeur_open_sockpath = getenv("LIBVOYEUR_SOCKET");
@@ -27,8 +30,7 @@ int voyeur_open(const char* path, int oflag, ...)
     else
       printf("LIBVOYEUR_SOCKET = %s\n", voyeur_open_sockpath);
 
-    //voyeur_open_next = (execve_fptr_t) dlsym(RTLD_NEXT, "execve"); // Linux...
-
+    VOYEUR_LOOKUP_NEXT(open_fptr_t, open);
     voyeur_open_sock = create_client_socket(voyeur_open_sockpath);
   }
 
@@ -56,10 +58,9 @@ int voyeur_open(const char* path, int oflag, ...)
   }
 
   // Pass through the call to the real open.
-  //return voyeur_open_next(path, oflag, mode);  // Linux...
   if (oflag & O_CREAT) {
-    return open(path, oflag, mode);
+    return VOYEUR_CALL_NEXT(open, path, oflag, mode);
   } else {
-    return open(path, oflag);
+    return VOYEUR_CALL_NEXT(open, path, oflag);
   }
 }

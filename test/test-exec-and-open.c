@@ -27,7 +27,7 @@ void run_exec_test()
 void run_open_test()
 {
   int fd;
-  char path[256];
+  char path[256] = { 0 };
   strlcpy(path, "/tmp/voyeur-test-open-XXXXXXXXX", 256);
   mktemp(path);
 
