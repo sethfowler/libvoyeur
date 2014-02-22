@@ -15,13 +15,17 @@ details of the calls are sent to the observing process over IPC, and locking is
 required. However, libvoyeur tries to be as efficient as possible: you only pay
 a performance penalty for the calls that you actually want to observe.
 
-Installation
-============
+Compilation
+===========
 
 Just run `make`. You can check that everything built correctly with `make check`.
 
 Usage
 =====
 
-The program doing the observing must link against `libvoyeur`. The public API
-can be found in `include/voyeur.h`.
+The program doing the observing must link against `libvoyeur`. You'll need to
+ensure that the various helper libraries like `libvoyeur-exec` are in the same
+directory as `libvoyeur`.
+
+The public API can be found in `include/voyeur.h`. The test harness, found in
+`test/voyeur-test.c`, has a number of examples.
