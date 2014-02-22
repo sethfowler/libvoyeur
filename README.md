@@ -9,7 +9,6 @@ The following calls are observable:
 
 - Process creation with `exec*`
 - File access with `open` and `close`
-- Socket access with `accept`, `bind`, `connect`, and `shutdown`
 
 There is a significant performance cost to the observed process, because the
 details of the calls are sent to the observing process over IPC, and locking is

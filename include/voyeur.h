@@ -4,13 +4,20 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-// Creating and destroying voyeur contexts.
+//////////////////////////////////////////////////
+// Creating and destroying libvoyeur contexts.
+//////////////////////////////////////////////////
+
 typedef void* voyeur_context_t;
 voyeur_context_t voyeur_context_create();
 void voyeur_context_destroy(voyeur_context_t ctx);
 
-// Registering interest in particular activities.
-// You can unregister interest in an activity by passing a NULL callback.
+
+//////////////////////////////////////////////////
+// Registering interest in particular events.
+//////////////////////////////////////////////////
+
+// Observing exec*() calls.
 typedef void (*voyeur_exec_callback)(const char* path,
                                      char* const argv[],
                                      char* const envp[],
@@ -26,6 +33,7 @@ void voyeur_observe_exec(voyeur_context_t ctx,
                          voyeur_exec_callback callback,
                          void* userdata);
 
+// Observing open() calls.
 typedef void (*voyeur_open_callback)(const char* path,
                                      int oflag,
                                      mode_t mode,
@@ -41,6 +49,7 @@ void voyeur_observe_open(voyeur_context_t ctx,
                          voyeur_open_callback callback,
                          void* userdata);
 
+// Observing close() calls.
 typedef void (*voyeur_close_callback)(int fd,
                                       int retval,
                                       void* userdata);
@@ -51,6 +60,11 @@ void voyeur_observe_close(voyeur_context_t ctx,
                           uint8_t opts,
                           voyeur_close_callback callback,
                           void* userdata);
+
+
+//////////////////////////////////////////////////
+// Observing processes.
+//////////////////////////////////////////////////
 
 // Create and observe a new process.
 // TODO: This should just be a convenience function for C callers. We
