@@ -19,6 +19,7 @@ void print_test_footer(char result)
 void exec_callback(const char* path,
                    char* const argv[],
                    char* const envp[],
+                   const char* cwd,
                    void* userdata)
 {
   printf("exec_callback called for path [%s]\n", path);
@@ -26,8 +27,13 @@ void exec_callback(const char* path,
   for (int i = 0 ; argv[i] ; ++i)
     printf("arg[%d] = %s\n", i, argv[i]);
 
-  for (int i = 0 ; envp[i] ; ++i)
-    printf("env[%d] = %s\n", i, envp[i]);
+  if (envp) {
+    for (int i = 0 ; envp[i] ; ++i)
+      printf("env[%d] = %s\n", i, envp[i]);
+  }
+
+  if (cwd)
+    printf("cwd = %s\n", cwd);
 
   char* result = (char*) userdata;
   *result = 1;
@@ -36,6 +42,7 @@ void exec_callback(const char* path,
 void exec_recursive_callback(const char* path,
                              char* const argv[],
                              char* const envp[],
+                             const char* cwd,
                              void* userdata)
 {
   printf("exec_callback called for path [%s]\n", path);
@@ -43,8 +50,13 @@ void exec_recursive_callback(const char* path,
   for (int i = 0 ; argv[i] ; ++i)
     printf("arg[%d] = %s\n", i, argv[i]);
 
-  for (int i = 0 ; envp[i] ; ++i)
-    printf("env[%d] = %s\n", i, envp[i]);
+  if (envp) {
+    for (int i = 0 ; envp[i] ; ++i)
+      printf("env[%d] = %s\n", i, envp[i]);
+  }
+
+  if (cwd)
+    printf("cwd = %s\n", cwd);
 
   unsigned* result = (unsigned*) userdata;
   *result += 1;
@@ -53,11 +65,13 @@ void exec_recursive_callback(const char* path,
 void open_callback(const char* path,
                    int oflag,
                    mode_t mode,
+                   const char* cwd,
                    int retval,
                    void* userdata)
 {
-  printf("open_callback called for path [%s] oflag [%d] mode [%o] rv [%d]\n",
-         path, oflag, (int) mode, retval);
+  printf("open_callback called for path [%s] oflag [%d] mode [%o] "
+         "cwd [%s] rv [%d]\n",
+         path, oflag, (int) mode, cwd ? cwd : "", retval);
 
   char* result = (char*) userdata;
   *result = 1;
@@ -67,7 +81,8 @@ void test_exec()
 {
   char result = 0;
   voyeur_context_t ctx = voyeur_context_create();
-  voyeur_observe_exec(ctx, OBSERVE_EXEC_DEFAULT, exec_callback, (void*) &result);
+  voyeur_observe_exec(ctx, OBSERVE_EXEC_CWD | OBSERVE_EXEC_ENV,
+                      exec_callback, (void*) &result);
 
   char* path   = "./test-exec";
   char* argv[] = { path, NULL };
@@ -101,7 +116,7 @@ void test_open()
 {
   char result = 0;
   voyeur_context_t ctx = voyeur_context_create();
-  voyeur_observe_open(ctx, OBSERVE_OPEN_DEFAULT, open_callback, (void*) &result);
+  voyeur_observe_open(ctx, OBSERVE_OPEN_CWD, open_callback, (void*) &result);
 
   char* path   = "./test-open";
   char* argv[] = { path, NULL };

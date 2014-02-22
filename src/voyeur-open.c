@@ -4,8 +4,9 @@
 
 #include <fcntl.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdlib.h>
-#include <stdio.h>
+#include <unistd.h>
 
 #include "dyld.h"
 #include "env.h"
@@ -15,7 +16,7 @@ typedef int (*open_fptr_t)(const char*, int, ...);
 VOYEUR_STATIC_DECLARE_NEXT(open_fptr_t, open)
 
 static char voyeur_open_initialized = 0;
-static const char* voyeur_open_sockpath = NULL;
+static uint8_t voyeur_open_opts = 0;
 static int voyeur_open_sock = 0;
 
 int VOYEUR_FUNC(open)(const char* path, int oflag, ...);
@@ -24,14 +25,11 @@ VOYEUR_INTERPOSE(open)
 int VOYEUR_FUNC(open)(const char* path, int oflag, ...)
 {
   if (!voyeur_open_initialized) {
-    voyeur_open_sockpath = getenv("LIBVOYEUR_SOCKET");
-    if (voyeur_open_sockpath == NULL)
-      printf("No LIBVOYEUR_SOCKET set\n");
-    else
-      printf("LIBVOYEUR_SOCKET = %s\n", voyeur_open_sockpath);
-
-    VOYEUR_LOOKUP_NEXT(open_fptr_t, open);
+    const char* voyeur_open_sockpath = getenv("LIBVOYEUR_SOCKET");
+    voyeur_open_opts = voyeur_decode_options(getenv("LIBVOYEUR_OPTS"), 1);
     voyeur_open_sock = create_client_socket(voyeur_open_sockpath);
+    VOYEUR_LOOKUP_NEXT(open_fptr_t, open);
+    voyeur_open_initialized = 1;
   }
 
   // Extract the mode argument if necessary.
@@ -66,6 +64,12 @@ int VOYEUR_FUNC(open)(const char* path, int oflag, ...)
   }
 
   voyeur_write_int(voyeur_open_sock, retval);
+
+  if (voyeur_open_opts & OBSERVE_OPEN_CWD) {
+    char* cwd = getcwd(NULL, 0);
+    voyeur_write_string(voyeur_open_sock, cwd, 0);
+    free(cwd);
+  }
 
   return retval;
 }

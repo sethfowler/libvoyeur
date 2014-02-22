@@ -23,16 +23,24 @@
 #define LIB_SUFFIX ".so"
 #endif
 
+#define TRY(_f, ...)                            \
+  do {                                          \
+    if (_f(__VA_ARGS__) < 0) {                  \
+      perror(#_f);                              \
+      exit(EXIT_FAILURE);                       \
+    }                                           \
+  } while (0)
+
 typedef struct {
-  unsigned char exec_opts;
+  uint8_t exec_opts;
   voyeur_exec_callback exec_cb;
   void* exec_userdata;
 
-  unsigned char open_opts;
+  uint8_t open_opts;
   voyeur_open_callback open_cb;
   void* open_userdata;
 
-  unsigned char close_opts;
+  uint8_t close_opts;
   voyeur_close_callback close_cb;
   void* close_userdata;
 } voyeur_context;
@@ -49,7 +57,7 @@ void voyeur_context_destroy(voyeur_context_t ctx)
 }
 
 void voyeur_observe_exec(voyeur_context_t ctx,
-                         unsigned char opts,
+                         uint8_t opts,
                          voyeur_exec_callback callback,
                          void* userdata)
 {
@@ -60,7 +68,7 @@ void voyeur_observe_exec(voyeur_context_t ctx,
 }
 
 void voyeur_observe_open(voyeur_context_t ctx,
-                         unsigned char opts,
+                         uint8_t opts,
                          voyeur_open_callback callback,
                          void* userdata)
 {
@@ -71,7 +79,7 @@ void voyeur_observe_open(voyeur_context_t ctx,
 }
 
 void voyeur_observe_close(voyeur_context_t ctx,
-                          unsigned char opts,
+                          uint8_t opts,
                           voyeur_close_callback callback,
                           void* userdata)
 {
@@ -104,10 +112,7 @@ int start_waitpid_thread(pid_t child_pid)
   // Create a pipe that will be used to announce the termination of
   // the child process.
   int waitpid_pipe[2];
-  if (pipe(waitpid_pipe)) {
-    perror("pipe");
-    exit(EXIT_FAILURE);
-  }
+  TRY(pipe, waitpid_pipe);
 
   waitpid_thread_arg* arg = malloc(sizeof(waitpid_thread_arg));
   arg->child_pid = child_pid;
@@ -154,53 +159,47 @@ void handle_exec(voyeur_context* context, int fd)
 {
   // Read the path.
   char* path;
-  if (voyeur_read_string(fd, &path, 0) < 0) {
-    perror("read");
-    exit(EXIT_FAILURE);
-  }
+  TRY(voyeur_read_string, fd, &path, 0);
 
   // Read the arguments.
   int argc;
-  if (voyeur_read_int(fd, &argc) < 0) {
-    perror("read");
-    exit(EXIT_FAILURE);
-  }
+  TRY(voyeur_read_int, fd, &argc);
 
   char** argv = malloc(sizeof(char*) * (argc + 1));
   for (int i = 0 ; i < argc ; ++i) {
     char* arg;
-    if (voyeur_read_string(fd, &arg, 0) < 0) {
-      perror("read");
-      exit(EXIT_FAILURE);
-    }
+    TRY(voyeur_read_string, fd, &arg, 0);
     argv[i] = arg;
   }
   argv[argc] = NULL;
 
   // Read the environment.
   int envc;
-  if (voyeur_read_int(fd, &envc) < 0) {
-    perror("read");
-    exit(EXIT_FAILURE);
+  char** envp = NULL;
+  if (context->exec_opts & OBSERVE_EXEC_ENV) {
+    TRY(voyeur_read_int, fd, &envc);
+
+    envp = malloc(sizeof(char*) * (envc + 1));
+    for (int i = 0 ; i < envc ; ++i) {
+      char* envvar;
+      TRY(voyeur_read_string, fd, &envvar, 0);
+      envp[i] = envvar;
+    }
+    envp[envc] = NULL;
   }
 
-  char** envp = malloc(sizeof(char*) * (envc + 1));
-  for (int i = 0 ; i < envc ; ++i) {
-    char* envvar;
-    if (voyeur_read_string(fd, &envvar, 0) < 0) {
-      perror("read");
-      exit(EXIT_FAILURE);
-    }
-    envp[i] = envvar;
+  // Read the current working directory.
+  char* cwd = NULL;
+  if (context->exec_opts & OBSERVE_EXEC_CWD) {
+    TRY(voyeur_read_string, fd, &cwd, 0);
   }
-  envp[envc] = NULL;
 
   // Invoke the callback, if there is one.
   // Note that we always have to read the data, even if the callback
   // isn't present, so we can move on to the next event. In practice
   // that should never happen, so it's not worth worrying about.
   if (context->exec_cb) {
-    context->exec_cb(path, argv, envp, context->exec_userdata);
+    context->exec_cb(path, argv, envp, cwd, context->exec_userdata);
   }
 
   // Free everything.
@@ -211,51 +210,39 @@ void handle_exec(voyeur_context* context, int fd)
   }
   free(argv);
 
-  for (int i = 0 ; i < envc ; ++i) {
-    free(envp[i]);
+  if (context->exec_opts & OBSERVE_EXEC_ENV) {
+    for (int i = 0 ; i < envc ; ++i) {
+      free(envp[i]);
+    }
+    free(envp);
   }
-  free(envp);
+
+  if (context->exec_opts & OBSERVE_EXEC_CWD) {
+    free(cwd);
+  }
 }
 
 void handle_open(voyeur_context* context, int fd)
 {
-  // Read the path.
   char* path;
-  if (voyeur_read_string(fd, &path, 0) < 0) {
-    perror("read");
-    exit(EXIT_FAILURE);
+  int oflag, mode, retval;
+
+  TRY(voyeur_read_string, fd, &path, 0);
+  TRY(voyeur_read_int, fd, &oflag);
+  TRY(voyeur_read_int, fd, &mode);
+  TRY(voyeur_read_int, fd, &retval);
+
+  // Read the current working directory.
+  char* cwd = NULL;
+  if (context->open_opts & OBSERVE_OPEN_CWD) {
+    TRY(voyeur_read_string, fd, &cwd, 0);
   }
 
-  // Read the flags.
-  int oflag;
-  if (voyeur_read_int(fd, &oflag) < 0) {
-    perror("read");
-    exit(EXIT_FAILURE);
-  }
-
-  // Read the mode.
-  int mode;
-  if (voyeur_read_int(fd, &mode) < 0) {
-    perror("read");
-    exit(EXIT_FAILURE);
-  }
-
-  // Read the return value.
-  int retval;
-  if (voyeur_read_int(fd, &retval) < 0) {
-    perror("read");
-    exit(EXIT_FAILURE);
-  }
-
-  // Invoke the callback, if there is one.
-  // Note that we always have to read the data, even if the callback
-  // isn't present, so we can move on to the next event. In practice
-  // that should never happen, so it's not worth worrying about.
   if (context->open_cb) {
-    context->open_cb(path, oflag, (mode_t) mode, retval, context->open_userdata);
+    context->open_cb(path, oflag, (mode_t) mode, cwd,
+                     retval, context->open_userdata);
   }
 
-  // Free everything.
   free(path);
 }
 
@@ -274,10 +261,7 @@ int run_server(voyeur_context* context,
   while (!child_exited) {
     // Block until input arrives.
     read_fd_set = active_fd_set;
-    if (select(FD_SETSIZE, &read_fd_set, NULL, NULL, NULL) < 0) {
-      perror("select");
-      exit(EXIT_FAILURE);
-    }
+    TRY(select, FD_SETSIZE, &read_fd_set, NULL, NULL, NULL);
 
     for (int fd = 0 ; fd < FD_SETSIZE ; ++fd) {
       if (FD_ISSET(fd, &read_fd_set)) {
@@ -321,8 +305,6 @@ int run_server(voyeur_context* context,
 }
 
 #define LIBS_SIZE 256
-// TODO: This is actually just the number of different observable activities.
-#define OPTS_SIZE 8
 
 char* requested_libs(voyeur_context* context)
 {
@@ -361,27 +343,16 @@ char* requested_libs(voyeur_context* context)
   return libs;
 }
 
-char make_options_printable(unsigned char opts)
-{
-  // Stripping the last 5 fits and bitwise-or'ing with '@' will always
-  // result in a printable character.
-  return '@' | ((char) opts & 0x1F);
-}
+// TODO: This is actually just the number of different observable activities.
+// (Plus room for a terminating null.)
+#define OPTS_SIZE 4
 
 char* requested_opts(voyeur_context* context)
 {
   char* opts = calloc(1, OPTS_SIZE);
-  char next_op[2] = { '\0', '\0' };
-
-  next_op[0] = make_options_printable(context->exec_opts);
-  strlcat(opts, next_op, OPTS_SIZE);
-
-  next_op[0] = make_options_printable(context->open_opts);
-  strlcat(opts, next_op, OPTS_SIZE);
-
-  next_op[0] = make_options_printable(context->close_opts);
-  strlcat(opts, next_op, OPTS_SIZE);
-
+  opts[0] = voyeur_encode_options(context->exec_opts);
+  opts[1] = voyeur_encode_options(context->open_opts);
+  opts[2] = voyeur_encode_options(context->close_opts);
   return opts;
 }
 
@@ -414,10 +385,7 @@ int voyeur_exec(voyeur_context_t ctx,
     int res = run_server(context, server_sock, child_pipe_output);
 
     // Clean up the socket file.
-    if (unlink(sockinfo.sun_path) < 0) {
-      perror("unlink");
-      exit(EXIT_FAILURE);
-    }
+    TRY(unlink, sockinfo.sun_path);
 
     return res;
   }

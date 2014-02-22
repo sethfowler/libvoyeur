@@ -69,3 +69,20 @@ char** voyeur_augment_environment(char* const* envp,
 
   return newenvp;
 }
+
+char voyeur_encode_options(uint8_t opts)
+{
+  // Stripping all but the last 5 bits and bitwise-or'ing with '@' will always
+  // result in a printable character. The downside is that we can only
+  // support 5 flags this way.
+  return '@' | ((char) opts & 0x1F);
+}
+
+uint8_t voyeur_decode_options(const char* opts, uint8_t offset)
+{
+  if (!opts || offset > strnlen(opts, 8)) {
+    return 0;
+  }
+
+  return (uint8_t) (opts[offset] & 0x1F);
+}

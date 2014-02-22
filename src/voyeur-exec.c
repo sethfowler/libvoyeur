@@ -30,6 +30,7 @@ int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[]
     printf("No LIBVOYEUR_OPTS set\n");
   else
     printf("LIBVOYEUR_OPTS = %s\n", opts);
+  uint8_t options = voyeur_decode_options(opts, 0);
 
   const char* sockpath = getenv("LIBVOYEUR_SOCKET");
   if (sockpath == NULL)
@@ -53,13 +54,19 @@ int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[]
     voyeur_write_string(sock, argv[i], 0);
   }
 
-  int envc = 0;
-  while (envp[envc]) {
-    ++envc;
+  if (options & OBSERVE_EXEC_ENV) {
+    int envc = 0;
+    while (envp[envc]) {
+      ++envc;
+    }
+    voyeur_write_int(sock, envc);
+    for (int i = 0 ; i < envc ; ++i) {
+      voyeur_write_string(sock, envp[i], 0);
+    }
   }
-  voyeur_write_int(sock, envc);
-  for (int i = 0 ; i < envc ; ++i) {
-    voyeur_write_string(sock, envp[i], 0);
+
+  if (options & OBSERVE_EXEC_CWD) {
+    voyeur_write_string(sock, getcwd(NULL, 0), 0);
   }
 
   // We might as well close the socket since there's no chance we'll
