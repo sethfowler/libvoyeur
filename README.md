@@ -1,7 +1,7 @@
 libvoyeur
 =========
 
-A BSD-licensed library for observing the private behavior of a process.
+A BSD-licensed library for observing the private behavior of a child process.
 
 Mac OS X and Linux are supported.
 
