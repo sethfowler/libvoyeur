@@ -8,7 +8,7 @@
 
 #include "net.h"
 
-int do_write(int fd, void* buf, size_t buf_size)
+static int do_write(int fd, void* buf, size_t buf_size)
 {
   ssize_t total_out = 0;
   while (total_out < (ssize_t) buf_size) {
@@ -31,7 +31,7 @@ int do_write(int fd, void* buf, size_t buf_size)
   return 0;
 }
 
-int do_read(int fd, void* buf, size_t buf_size)
+static int do_read(int fd, void* buf, size_t buf_size)
 {
   ssize_t total_in = 0;
   while (total_in < (ssize_t) buf_size) {
@@ -140,7 +140,7 @@ int voyeur_read_string(int fd, char** val, size_t maxlen)
   return 0;
 }
 
-int create_server_socket(struct sockaddr_un* sockinfo)
+int voyeur_create_server_socket(struct sockaddr_un* sockinfo)
 {
   // Configure a unix domain socket at a temporary path.
   // TODO: Switch to using mkdtemp and placing the socket
@@ -169,7 +169,7 @@ int create_server_socket(struct sockaddr_un* sockinfo)
   return server_sock;
 }
 
-int create_client_socket(const char* sockpath)
+int voyeur_create_client_socket(const char* sockpath)
 {
   struct sockaddr_un sockinfo;
 

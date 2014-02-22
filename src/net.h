@@ -22,7 +22,8 @@
 
 typedef enum {
   VOYEUR_EVENT_EXEC = 0,
-  VOYEUR_EVENT_OPEN
+  VOYEUR_EVENT_OPEN,
+  VOYEUR_EVENT_CLOSE
 } voyeur_event_type;
 
 // Reader and writer for event types.
@@ -62,9 +63,9 @@ int voyeur_read_string(int fd, char** val, size_t maxlen);
 // provided an uninitialized sockaddr_un struct. After
 // create_server_socket returns, the socket path will be available
 // in sockinfo->sun_path.
-int create_server_socket(struct sockaddr_un* sockinfo);
+int voyeur_create_server_socket(struct sockaddr_un* sockinfo);
 
 // Creates a socket and connects to the provided socket path on it.
-int create_client_socket(const char* sockpath);
+int voyeur_create_client_socket(const char* sockpath);
 
 #endif

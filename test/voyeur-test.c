@@ -77,6 +77,13 @@ void open_callback(const char* path,
   *result = 1;
 }
 
+void close_callback(int fd, int retval, void* userdata)
+{
+  printf("close_callback called for fd [%d] retval [%d]\n", fd, retval);
+
+  char* result = (char*) userdata;
+  *result = 1;
+}
 void test_exec()
 {
   char result = 0;
@@ -147,11 +154,30 @@ void test_exec_and_open()
   voyeur_context_destroy(ctx);
 }
 
+void test_open_and_close()
+{
+  char open_result = 0, close_result = 0;
+  voyeur_context_t ctx = voyeur_context_create();
+  voyeur_observe_open(ctx, OBSERVE_OPEN_DEFAULT, open_callback, (void*) &open_result);
+  voyeur_observe_close(ctx, OBSERVE_CLOSE_DEFAULT, close_callback, (void*) &close_result);
+
+  char* path   = "./test-open-and-close";
+  char* argv[] = { path, NULL };
+  char* envp[] = { NULL };
+
+  print_test_header("open and close");
+  voyeur_exec(ctx, path, argv, envp);
+  print_test_footer(open_result && close_result);
+
+  voyeur_context_destroy(ctx);
+}
+
 int main(int argc, char** argv)
 {
   test_exec();
   test_exec_recursive();
   test_open();
   test_exec_and_open();
+  test_open_and_close();
   return 0;
 }

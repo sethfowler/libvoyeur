@@ -246,6 +246,18 @@ void handle_open(voyeur_context* context, int fd)
   free(path);
 }
 
+void handle_close(voyeur_context* context, int fd)
+{
+  int fildes, retval;
+
+  TRY(voyeur_read_int, fd, &fildes);
+  TRY(voyeur_read_int, fd, &retval);
+
+  if (context->close_cb) {
+    context->close_cb(fildes, retval, context->close_userdata);
+  }
+}
+
 int run_server(voyeur_context* context,
                int server_sock,
                int child_pipe_output)
@@ -284,6 +296,8 @@ int run_server(voyeur_context* context,
             handle_exec(context, fd);
           } else if (type == VOYEUR_EVENT_OPEN) {
             handle_open(context, fd);
+          } else if (type == VOYEUR_EVENT_CLOSE) {
+            handle_close(context, fd);
           } else {
             fprintf(stderr, "libvoyeur: got unknown event type %u\n",
                     (unsigned) type);
@@ -367,7 +381,7 @@ int voyeur_exec(voyeur_context_t ctx,
   // Prepare the server. We need to do this in advance both to avoid
   // racing and so that so we can include the socket path in the
   // environment variables.
-  int server_sock = create_server_socket(&sockinfo);
+  int server_sock = voyeur_create_server_socket(&sockinfo);
   
   pid_t child_pid;
   if ((child_pid = fork()) == 0) {

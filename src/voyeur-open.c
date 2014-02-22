@@ -3,6 +3,7 @@
 #endif
 
 #include <fcntl.h>
+#include <pthread.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -15,6 +16,7 @@
 typedef int (*open_fptr_t)(const char*, int, ...);
 VOYEUR_STATIC_DECLARE_NEXT(open_fptr_t, open)
 
+static pthread_mutex_t voyeur_open_mutex = PTHREAD_MUTEX_INITIALIZER;
 static char voyeur_open_initialized = 0;
 static uint8_t voyeur_open_opts = 0;
 static int voyeur_open_sock = 0;
@@ -24,10 +26,12 @@ VOYEUR_INTERPOSE(open)
 
 int VOYEUR_FUNC(open)(const char* path, int oflag, ...)
 {
+  pthread_mutex_lock(&voyeur_open_mutex);
+  
   if (!voyeur_open_initialized) {
     const char* voyeur_open_sockpath = getenv("LIBVOYEUR_SOCKET");
     voyeur_open_opts = voyeur_decode_options(getenv("LIBVOYEUR_OPTS"), 1);
-    voyeur_open_sock = create_client_socket(voyeur_open_sockpath);
+    voyeur_open_sock = voyeur_create_client_socket(voyeur_open_sockpath);
     VOYEUR_LOOKUP_NEXT(open_fptr_t, open);
     voyeur_open_initialized = 1;
   }
@@ -70,6 +74,8 @@ int VOYEUR_FUNC(open)(const char* path, int oflag, ...)
     voyeur_write_string(voyeur_open_sock, cwd, 0);
     free(cwd);
   }
+
+  pthread_mutex_unlock(&voyeur_open_mutex);
 
   return retval;
 }

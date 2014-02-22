@@ -40,7 +40,7 @@ int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[]
 
 
   // Write the event to the socket.
-  int sock = create_client_socket(sockpath);
+  int sock = voyeur_create_client_socket(sockpath);
 
   voyeur_write_event_type(sock, VOYEUR_EVENT_EXEC);
   voyeur_write_string(sock, path, 0);
