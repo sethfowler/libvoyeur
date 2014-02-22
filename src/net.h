@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <sys/un.h>
 
+#include "event.h"
+
 // All libvoyeur events consist of an event type followed by a
 // sequence of bytes, integers, and strings particular to the event.
 //
@@ -19,12 +21,6 @@
 //   voyeur_read_int(fd, &flags);
 //
 // Every read/write function returns 0 on success and -1 on error.
-
-typedef enum {
-  VOYEUR_EVENT_EXEC = 0,
-  VOYEUR_EVENT_OPEN,
-  VOYEUR_EVENT_CLOSE
-} voyeur_event_type;
 
 // Reader and writer for event types.
 int voyeur_write_event_type(int fd, voyeur_event_type val);
