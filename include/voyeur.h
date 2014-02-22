@@ -20,8 +20,9 @@ typedef enum {
   OBSERVE_EXEC_ENV = 1 << 1
 } voyeur_exec_options;
 // TODO: Encode options in ascii. | with '@'. Gives 5 bits.
+// (Which means need to & each individual opts with 0x1F.)
 void voyeur_observe_exec(voyeur_context_t ctx,
-                         voyeur_exec_options opts,
+                         unsigned char opts,
                          voyeur_exec_callback callback,
                          void* userdata);
 
@@ -35,7 +36,7 @@ typedef enum {
   OBSERVE_OPEN_CWD = 1 << 0
 } voyeur_open_options;
 void voyeur_observe_open(voyeur_context_t ctx,
-                         voyeur_open_options opts,
+                         unsigned char opts,
                          voyeur_open_callback callback,
                          void* userdata);
 
@@ -46,7 +47,7 @@ typedef enum {
   OBSERVE_CLOSE_DEFAULT = 0
 } voyeur_close_options;
 void voyeur_observe_close(voyeur_context_t ctx,
-                          voyeur_close_options opts,
+                          unsigned char opts,
                           voyeur_close_callback callback,
                           void* userdata);
 

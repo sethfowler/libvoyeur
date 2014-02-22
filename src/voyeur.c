@@ -24,11 +24,17 @@
 #endif
 
 typedef struct {
+  unsigned char exec_opts;
   voyeur_exec_callback exec_cb;
   void* exec_userdata;
 
+  unsigned char open_opts;
   voyeur_open_callback open_cb;
   void* open_userdata;
+
+  unsigned char close_opts;
+  voyeur_close_callback close_cb;
+  void* close_userdata;
 } voyeur_context;
 
 voyeur_context_t voyeur_context_create()
@@ -43,21 +49,36 @@ void voyeur_context_destroy(voyeur_context_t ctx)
 }
 
 void voyeur_observe_exec(voyeur_context_t ctx,
+                         unsigned char opts,
                          voyeur_exec_callback callback,
                          void* userdata)
 {
   voyeur_context* context = (voyeur_context*) ctx;
+  context->exec_opts = opts;
   context->exec_cb = callback;
   context->exec_userdata = userdata;
 }
 
 void voyeur_observe_open(voyeur_context_t ctx,
+                         unsigned char opts,
                          voyeur_open_callback callback,
                          void* userdata)
 {
   voyeur_context* context = (voyeur_context*) ctx;
+  context->open_opts = opts;
   context->open_cb = callback;
   context->open_userdata = userdata;
+}
+
+void voyeur_observe_close(voyeur_context_t ctx,
+                          unsigned char opts,
+                          voyeur_close_callback callback,
+                          void* userdata)
+{
+  voyeur_context* context = (voyeur_context*) ctx;
+  context->close_opts = opts;
+  context->close_cb = callback;
+  context->close_userdata = userdata;
 }
 
 typedef struct {
@@ -219,12 +240,19 @@ void handle_open(voyeur_context* context, int fd)
     exit(EXIT_FAILURE);
   }
 
+  // Read the return value.
+  int retval;
+  if (voyeur_read_int(fd, &retval) < 0) {
+    perror("read");
+    exit(EXIT_FAILURE);
+  }
+
   // Invoke the callback, if there is one.
   // Note that we always have to read the data, even if the callback
   // isn't present, so we can move on to the next event. In practice
   // that should never happen, so it's not worth worrying about.
   if (context->open_cb) {
-    context->open_cb(path, oflag, (mode_t) mode, context->open_userdata);
+    context->open_cb(path, oflag, (mode_t) mode, retval, context->open_userdata);
   }
 
   // Free everything.
@@ -293,7 +321,8 @@ int run_server(voyeur_context* context,
 }
 
 #define LIBS_SIZE 256
-#define LIB_PREFIX "/home/mfowler/Code/libvoyeur/build/"
+// TODO: This is actually just the number of different observable activities.
+#define OPTS_SIZE 8
 
 char* requested_libs(voyeur_context* context)
 {
@@ -319,9 +348,41 @@ char* requested_libs(voyeur_context* context)
     prev = 1;
   }
 
+  if (context->close_cb) {
+    if (prev) strlcat(libs, ":", LIBS_SIZE);
+    strlcat(libs, cwd, LIBS_SIZE);
+    strlcat(libs, "/", LIBS_SIZE);
+    strlcat(libs, "libvoyeur-close" LIB_SUFFIX, LIBS_SIZE);
+    prev = 1;
+  }
+
   free(cwd);
 
   return libs;
+}
+
+char make_options_printable(unsigned char opts)
+{
+  // Stripping the last 5 fits and bitwise-or'ing with '@' will always
+  // result in a printable character.
+  return '@' | ((char) opts & 0x1F);
+}
+
+char* requested_opts(voyeur_context* context)
+{
+  char* opts = calloc(1, OPTS_SIZE);
+  char next_op[2] = { '\0', '\0' };
+
+  next_op[0] = make_options_printable(context->exec_opts);
+  strlcat(opts, next_op, OPTS_SIZE);
+
+  next_op[0] = make_options_printable(context->open_opts);
+  strlcat(opts, next_op, OPTS_SIZE);
+
+  next_op[0] = make_options_printable(context->close_opts);
+  strlcat(opts, next_op, OPTS_SIZE);
+
+  return opts;
 }
 
 int voyeur_exec(voyeur_context_t ctx,
@@ -341,7 +402,8 @@ int voyeur_exec(voyeur_context_t ctx,
   if ((child_pid = fork()) == 0) {
     // Add libvoyeur-specific environment variables.
     char* libs = requested_libs(context);
-    char** newenvp = voyeur_augment_environment(envp, libs, sockinfo.sun_path);
+    char* opts = requested_opts(context);
+    char** newenvp = voyeur_augment_environment(envp, libs, opts, sockinfo.sun_path);
 
     // Run the child process. This will never return.
     run_child(path, argv, newenvp);

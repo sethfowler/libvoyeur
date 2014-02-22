@@ -9,6 +9,7 @@
 // memory is irrelevant.
 char** voyeur_augment_environment(char* const* envp,
                                   const char* voyeur_libs,
+                                  const char* voyeur_opts,
                                   const char* sockpath);
 
 #endif

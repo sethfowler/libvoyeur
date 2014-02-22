@@ -19,17 +19,24 @@ int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[]
 {
   // In the case of exec we don't bother caching anything, since exec
   // will wipe out this whole process image anyway.
+  const char* libs = getenv("LIBVOYEUR_LIBS");
+  if (libs == NULL)
+    printf("No LIBVOYEUR_LIBS set\n");
+  else
+    printf("LIBVOYEUR_LIBS = %s\n", libs);
+
+  const char* opts = getenv("LIBVOYEUR_OPTS");
+  if (opts == NULL)
+    printf("No LIBVOYEUR_OPTS set\n");
+  else
+    printf("LIBVOYEUR_OPTS = %s\n", opts);
+
   const char* sockpath = getenv("LIBVOYEUR_SOCKET");
   if (sockpath == NULL)
     printf("No LIBVOYEUR_SOCKET set\n");
   else
     printf("LIBVOYEUR_SOCKET = %s\n", sockpath);
 
-  const char* libs = getenv("LIBVOYEUR_LIBS");
-  if (libs == NULL)
-    printf("No LIBVOYEUR_LIBS set\n");
-  else
-    printf("LIBVOYEUR_LIBS = %s\n", libs);
 
   // Write the event to the socket.
   int sock = create_client_socket(sockpath);
@@ -61,7 +68,7 @@ int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[]
   close(sock);
 
   // Add libvoyeur-specific environment variables.
-  char** newenvp = voyeur_augment_environment(envp, libs, sockpath);
+  char** newenvp = voyeur_augment_environment(envp, libs, opts, sockpath);
 
   // Pass through the call to the real execve.
   VOYEUR_DECLARE_NEXT(execve_fptr_t, execve);

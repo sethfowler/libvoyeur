@@ -53,10 +53,11 @@ void exec_recursive_callback(const char* path,
 void open_callback(const char* path,
                    int oflag,
                    mode_t mode,
+                   int retval,
                    void* userdata)
 {
-  printf("open_callback called for path [%s] oflag [%d] mode [%o]\n",
-         path, oflag, (int) mode);
+  printf("open_callback called for path [%s] oflag [%d] mode [%o] rv [%d]\n",
+         path, oflag, (int) mode, retval);
 
   char* result = (char*) userdata;
   *result = 1;
@@ -66,7 +67,7 @@ void test_exec()
 {
   char result = 0;
   voyeur_context_t ctx = voyeur_context_create();
-  voyeur_observe_exec(ctx, exec_callback, (void*) &result);
+  voyeur_observe_exec(ctx, OBSERVE_EXEC_DEFAULT, exec_callback, (void*) &result);
 
   char* path   = "./test-exec";
   char* argv[] = { path, NULL };
@@ -83,7 +84,7 @@ void test_exec_recursive()
 {
   unsigned result = 0;
   voyeur_context_t ctx = voyeur_context_create();
-  voyeur_observe_exec(ctx, exec_recursive_callback, (void*) &result);
+  voyeur_observe_exec(ctx, OBSERVE_EXEC_DEFAULT, exec_recursive_callback, (void*) &result);
 
   char* path   = "./test-exec-recursive";
   char* argv[] = { path, NULL };
@@ -100,7 +101,7 @@ void test_open()
 {
   char result = 0;
   voyeur_context_t ctx = voyeur_context_create();
-  voyeur_observe_open(ctx, open_callback, (void*) &result);
+  voyeur_observe_open(ctx, OBSERVE_OPEN_DEFAULT, open_callback, (void*) &result);
 
   char* path   = "./test-open";
   char* argv[] = { path, NULL };
@@ -117,8 +118,8 @@ void test_exec_and_open()
 {
   char exec_result = 0, open_result = 0;
   voyeur_context_t ctx = voyeur_context_create();
-  voyeur_observe_exec(ctx, exec_callback, (void*) &exec_result);
-  voyeur_observe_open(ctx, open_callback, (void*) &open_result);
+  voyeur_observe_exec(ctx, OBSERVE_EXEC_DEFAULT, exec_callback, (void*) &exec_result);
+  voyeur_observe_open(ctx, OBSERVE_OPEN_DEFAULT, open_callback, (void*) &open_result);
 
   char* path   = "./test-exec-and-open";
   char* argv[] = { path, NULL };

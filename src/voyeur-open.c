@@ -46,6 +46,14 @@ int VOYEUR_FUNC(open)(const char* path, int oflag, ...)
     va_end(args);
   }
   
+  // Pass through the call to the real open.
+  int retval;
+  if (oflag & O_CREAT) {
+    retval = VOYEUR_CALL_NEXT(open, path, oflag, mode);
+  } else {
+    retval = VOYEUR_CALL_NEXT(open, path, oflag);
+  }
+
   // Write the event to the socket.
   voyeur_write_event_type(voyeur_open_sock, VOYEUR_EVENT_OPEN);
   voyeur_write_string(voyeur_open_sock, path, 0);
@@ -57,10 +65,7 @@ int VOYEUR_FUNC(open)(const char* path, int oflag, ...)
     voyeur_write_int(voyeur_open_sock, 0);
   }
 
-  // Pass through the call to the real open.
-  if (oflag & O_CREAT) {
-    return VOYEUR_CALL_NEXT(open, path, oflag, mode);
-  } else {
-    return VOYEUR_CALL_NEXT(open, path, oflag);
-  }
+  voyeur_write_int(voyeur_open_sock, retval);
+
+  return retval;
 }
