@@ -148,6 +148,18 @@ int run_server(voyeur_context* context,
   }
 }
 
+char** voyeur_prepare(voyeur_context_t ctx, char* const envp[])
+{
+  exit(EXIT_FAILURE);
+  return NULL;
+}
+
+int voyeur_start(voyeur_context_t ctx, pid_t child_pid)
+{
+  exit(EXIT_FAILURE);
+  return -1;
+}
+
 int voyeur_exec(voyeur_context_t ctx,
                 const char* path,
                 char* const argv[],
@@ -157,7 +169,7 @@ int voyeur_exec(voyeur_context_t ctx,
   voyeur_context* context = (voyeur_context*) ctx;
 
   // Prepare the server. We need to do this in advance both to avoid
-  // racing and so that so we can include the socket path in the
+  // racing and so that we can include the socket path in the
   // environment variables.
   int server_sock = voyeur_create_server_socket(&sockinfo);
   

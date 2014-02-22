@@ -9,12 +9,19 @@
 //////////////////////////////////////////////////
 
 typedef void* voyeur_context_t;
+
+// Creates a context used to specify which events you want to observe
+// and as an owner for resources allocated by voyeur_prepare().
 voyeur_context_t voyeur_context_create();
+
+// Destroys a context. This must always be called after voyeur_start()
+// is finished to release the resources allocated by voyeur_prepare().
+// After destroying a context, it is invalid and should not be used again.
 void voyeur_context_destroy(voyeur_context_t ctx);
 
 
 //////////////////////////////////////////////////
-// Registering interest in particular events.
+// Registering callbacks for particular events.
 //////////////////////////////////////////////////
 
 // Observing exec*() calls.
@@ -66,15 +73,27 @@ void voyeur_observe_close(voyeur_context_t ctx,
 // Observing processes.
 //////////////////////////////////////////////////
 
-// Create and observe a new process.
-// TODO: This should just be a convenience function for C callers. We
-// also need an API that will perform setup but allow the actual
-// vfork/exec to be performed by external code. This will make
-// bindings much simpler in the end, since we won't have to duplicate
-// all of the ugly infrastructure needed to get portable execvpe and
-// handle forking with green threads and all of that.
-// However, to create that low-level API, I'll need to write the linux
-// version of this function as well.
+// Prepare to observe a child process. This will acquire resources
+// that libvoyeur needs to do its work and create a modified
+// environment, based upon the provided template, that should be
+// passed to the child process when it gets exec'd. It's the caller's
+// responsibility to free this environment. This function should be
+// called before forking. After calling voyeur_prepare(), it isn't
+// safe to call // voyeur_observe_* functions on the same context anymore.
+char** voyeur_prepare(voyeur_context_t ctx, char* const envp[]);
+
+// Start observing a child process. This will block until the child
+// process completes, at which time it will return the exit status of
+// the child process. While the child process is running, the
+// callbacks you've registered with the voyeur_observe_* functions
+// will be called. Call this after forking, in the parent process.
+int voyeur_start(voyeur_context_t ctx, pid_t child_pid);
+
+// Create and observe a new child process. voyeur_exec() is a
+// convenience function that behaves just as if you had called
+// voyeur_prepare(), forked, called execve() to start your child
+// process, and then called voyeur_start() from the parent process.
+// Like voyeur_start(), it returns the exit status of the child.
 int voyeur_exec(voyeur_context_t ctx,
                 const char* path,
                 char* const argv[],
