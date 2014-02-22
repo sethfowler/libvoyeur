@@ -27,5 +27,6 @@ The program doing the observing must link against `libvoyeur`. You'll need to
 ensure that the various helper libraries like `libvoyeur-exec` are in the same
 directory as `libvoyeur`.
 
-The public API can be found in `include/voyeur.h`. The test harness, found in
-`test/voyeur-test.c`, has a number of examples.
+The public API is documented in [voyeur.h](include/voyeur.h).
+
+For more examples, the tests in [voyeur-test.c](test/voyeur-test.c) might be useful.

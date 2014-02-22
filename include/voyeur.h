@@ -5,6 +5,41 @@
 #include <stdlib.h>
 
 //////////////////////////////////////////////////
+// Overview of libvoyeur.
+//////////////////////////////////////////////////
+
+// Libvoyeur is a library for observing the private activity of a
+// child process. It does this by using the dynamic linker to override
+// the implementations of standard library functions. When those
+// functions are called, libvoyeur generates events, and by
+// registering callbacks you can observe those events and take
+// whatever action you want.
+
+// The flow of using libvoyeur is simple. Start by creating a context:
+//
+// > voyeur_context_t ctx = voyeur_context_create();
+//
+// Then register to observe some events:
+//
+// > voyeur_observe_exec(ctx,
+// >                     OBSERVE_EXEC_CMD | OBSERVE_EXEC_ENV,
+// >                     my_exec_callback,
+// >                     NULL);
+//
+// Use voyeur_exec() to start and observe the child process:
+//
+// > voyeur_exec(ctx, "/usr/bin/program", argv, envp);
+//
+// Finally, destroy the context:
+//
+// > voyeur_context_destroy(ctx);
+
+// Users with more complex needs or who intend to provide bindings to
+// languages other than C will probably want to use voyeur_prepare()
+// and voyeur_start() rather than voyeur_exec(). Their documentation
+// is below.
+
+//////////////////////////////////////////////////
 // Creating and destroying libvoyeur contexts.
 //////////////////////////////////////////////////
 
@@ -15,7 +50,7 @@ typedef void* voyeur_context_t;
 voyeur_context_t voyeur_context_create();
 
 // Destroys a context. This must always be called after voyeur_start()
-// is finished to release the resources allocated by voyeur_prepare().
+// or voyeur_exec() is finished to release the resources libvoyeur has allocated.
 // After destroying a context, it is invalid and should not be used again.
 void voyeur_context_destroy(voyeur_context_t ctx);
 
@@ -73,27 +108,46 @@ void voyeur_observe_close(voyeur_context_t ctx,
 // Observing processes.
 //////////////////////////////////////////////////
 
-// Prepare to observe a child process. This will acquire resources
-// that libvoyeur needs to do its work and create a modified
-// environment, based upon the provided template, that should be
-// passed to the child process when it gets exec'd. It's the caller's
-// responsibility to free this environment. This function should be
-// called before forking. After calling voyeur_prepare(), it isn't
-// safe to call // voyeur_observe_* functions on the same context anymore.
+// Prepare to observe a child process.
+//
+// This will acquire resources that libvoyeur needs to do its work and
+// create a modified environment, based upon the provided template,
+// that should be passed to the child process when it gets exec'd.
+// It's the caller's responsibility to free this environment.
+//
+// This function should be called before forking. After calling
+// voyeur_prepare(), it isn't safe to call voyeur_observe_* functions
+// on the same context anymore.
 char** voyeur_prepare(voyeur_context_t ctx, char* const envp[]);
 
-// Start observing a child process. This will block until the child
-// process completes, at which time it will return the exit status of
-// the child process. While the child process is running, the
-// callbacks you've registered with the voyeur_observe_* functions
-// will be called. Call this after forking, in the parent process.
+// Start observing a child process.
+//
+// This will block until the child process completes, at which time
+// it will return its exit status. While the child process is running,
+// the callbacks you've registered with the voyeur_observe_* functions
+// will be called.
+//
+// Call this after forking, in the parent process. After
+// voyeur_start() returns, you should use voyeur_context_destroy()
+// to release the resources libvoyeur has acquired.
 int voyeur_start(voyeur_context_t ctx, pid_t child_pid);
 
-// Create and observe a new child process. voyeur_exec() is a
-// convenience function that behaves just as if you had called
-// voyeur_prepare(), forked, called execve() to start your child
-// process, and then called voyeur_start() from the parent process.
-// Like voyeur_start(), it returns the exit status of the child.
+// Create and observe a new child process.
+//
+// voyeur_exec() is a convenience function that behaves just as if
+// you had made this sequence of calls:
+//
+// > voyeur_envp = voyeur_prepare(ctx, envp);
+// > if ((pid = fork()) == 0) {
+// >   execve(path, argv, voyeur_envp);
+// > } else {
+// >   free(voyeur_envp);
+// >   return voyeur_start(ctx, pid);
+// > }
+//
+// Like voyeur_start(), it returns the exit status of the child. After
+// voyeur_exec() returns, you should use voyeur_context_destroy() to
+// release the resources libvoyeur has acquired.
 int voyeur_exec(voyeur_context_t ctx,
                 const char* path,
                 char* const argv[],
