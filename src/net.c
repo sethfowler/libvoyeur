@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include "net.h"
+#include "util.h"
 
 static int do_write(int fd, void* buf, size_t buf_size)
 {
@@ -155,16 +156,8 @@ int voyeur_create_server_socket(struct sockaddr_un* sockinfo)
 
   // Start the server.
   int server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (bind(server_sock,
-           (struct sockaddr*) sockinfo,
-           sizeof(struct sockaddr_un)) < 0) {
-    perror("bind");
-    exit(EXIT_FAILURE);
-  }
-  if (listen(server_sock, 5) < 0) {
-    perror("listen");
-    exit(EXIT_FAILURE);
-  }
+  TRY(bind, server_sock, (struct sockaddr*) sockinfo, sizeof(struct sockaddr_un));
+  TRY(listen, server_sock, 5);
 
   return server_sock;
 }
@@ -181,12 +174,7 @@ int voyeur_create_client_socket(const char* sockpath)
 
   // Connect to the server.
   int client_sock = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (connect(client_sock,
-              (struct sockaddr*) &sockinfo,
-              sizeof(struct sockaddr_un)) < 0) {
-    perror("connect");
-    exit(EXIT_FAILURE);
-  }
+  TRY(connect, client_sock, (struct sockaddr*) &sockinfo, sizeof(struct sockaddr_un));
   
   return client_sock;
 }

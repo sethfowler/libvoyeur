@@ -17,14 +17,7 @@
 #include "env.h"
 #include "event.h"
 #include "net.h"
-
-#define TRY(_f, ...)                            \
-  do {                                          \
-    if (_f(__VA_ARGS__) < 0) {                  \
-      perror(#_f);                              \
-      exit(EXIT_FAILURE);                       \
-    }                                           \
-  } while (0)
+#include "util.h"
 
 voyeur_context_t voyeur_context_create()
 {
