@@ -1,3 +1,4 @@
+#include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -141,27 +142,40 @@ void voyeur_handle_event(voyeur_context* context, voyeur_event_type type, int fd
 #define LIB_SUFFIX ".so"
 #endif
 
-#define ON_EVENT(_, e) \
-  if (context->e##_cb) { \
-    if (prev) strlcat(libs, ":", LIBS_SIZE); \
-    strlcat(libs, cwd, LIBS_SIZE); \
-    strlcat(libs, "/", LIBS_SIZE); \
+#define ON_EVENT(_, e)                                    \
+  if (context->e##_cb) {                                  \
+    if (prev) strlcat(libs, ":", LIBS_SIZE);              \
+    strlcat(libs, libdir, LIBS_SIZE);                     \
     strlcat(libs, "libvoyeur-" #e LIB_SUFFIX, LIBS_SIZE); \
-    prev = 1; \
-  } \
+    prev = 1;                                             \
+  }                                                       \
 
 char* voyeur_requested_libs(voyeur_context* context)
 {
   char* libs = calloc(1, LIBS_SIZE);
   char prev = 0;
   
-  // TODO: This should be relative to the library location, not the current
-  // directory. This is just a quick hack.
-  char* cwd = getcwd(NULL, 0);
+  bool did_allocate = false;
+  char* libdir = "./";
+  Dl_info dlinfo;
+  if (dladdr(voyeur_requested_libs, &dlinfo) && dlinfo.dli_fname) {
+    // Strip the filename. It'd be great if 'dirname' could be used
+    // for this, but it's not thread safe. Note that if no slash is
+    // found, we just stick with "./".
+    char* last_slash = strrchr(dlinfo.dli_fname, '/');
+    if (last_slash) {
+      did_allocate = true;
+      int len_with_slash_and_null = (last_slash - dlinfo.dli_fname) + 2;
+      libdir = calloc(1, len_with_slash_and_null);
+      strlcpy(libdir, dlinfo.dli_fname, len_with_slash_and_null);
+    }
+  }
 
   MAP_EVENTS
 
-  free(cwd);
+  if (did_allocate) {
+    free(libdir);
+  }
 
   return libs;
 }
