@@ -2,7 +2,7 @@ LIBNAMES=libvoyeur libvoyeur-exec libvoyeur-open libvoyeur-close
 TESTNAMES=test-exec test-exec-recursive test-open test-exec-and-open test-open-and-close test-exec-variants
 TESTHARNESSNAME=voyeur-test
 LIBNULLNAME=libnull
-EXAMPLENAMES=voyeur-watch-exec
+EXAMPLENAMES=voyeur-watch-exec voyeur-watch-open
 
 CC=clang
 CFLAGS=-I./include -g

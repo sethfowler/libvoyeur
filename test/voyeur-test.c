@@ -52,9 +52,8 @@ void open_callback(const char* path,
                    pid_t pid,
                    void* userdata)
 {
-  printf("open_callback called for path [%s] oflag [%d] mode [%o] "
-         "cwd [%s] rv [%d] pid [%u]\n",
-         path, oflag, (int) mode, cwd ? cwd : "", retval, (unsigned) pid);
+  printf("[OPEN] %s (flags %d) (mode %o) (in %s) (rv %d) (pid %u)\n",
+         path, oflag, (unsigned) mode, cwd, retval, pid);
 
   char* result = (char*) userdata;
   *result = 1;
@@ -62,8 +61,7 @@ void open_callback(const char* path,
 
 void close_callback(int fd, int retval, pid_t pid, void* userdata)
 {
-  printf("close_callback called for fd [%d] rv [%d] pid [%u]\n",
-         fd, retval, pid);
+  printf("[CLOSE] %d (rv %d) (pid %u)\n", fd, retval, pid);
 
   char* result = (char*) userdata;
   *result = 1;

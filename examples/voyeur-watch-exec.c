@@ -19,7 +19,7 @@ void exec_callback(const char* path,
   }
 
   fprintf(stderr, " (in %s) (pid %u) (ppid %u)\n",
-          cwd, (unsigned) pid, (unsigned) ppid);
+                  cwd, (unsigned) pid, (unsigned) ppid);
 }
 
 void go(int argc, char** argv)
