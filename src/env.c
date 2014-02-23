@@ -15,12 +15,13 @@
 #define INSERT_LIBS "LD_PRELOAD="
 #endif
 
-#define ENV_VAR_SIZE 2048
+typedef char env_buf[2048];
 
 char** voyeur_augment_environment(char* const* envp,
                                   const char* voyeur_libs,
                                   const char* voyeur_opts,
-                                  const char* sockpath)
+                                  const char* sockpath,
+                                  void** buf_out)
 {
   // Determine the size of the original environment.
   unsigned envlen = 0;
@@ -33,38 +34,35 @@ char** voyeur_augment_environment(char* const* envp,
     }
   }
 
-  // Allocate the new environment variables and store in the context
-  // to make it possible to free them later.
-  // TODO: Change the comment once I decide what to do here.
-  char* dyld_insert_libraries_env = malloc(ENV_VAR_SIZE);
-  strlcpy(dyld_insert_libraries_env, INSERT_LIBS, ENV_VAR_SIZE);
-  strlcat(dyld_insert_libraries_env, voyeur_libs, ENV_VAR_SIZE);
+  // Allocate the new environment variables.
+  env_buf* buf = malloc(sizeof(env_buf) * 4);
+  *buf_out = (void*) buf;
+
+  strlcpy(buf[0], INSERT_LIBS, sizeof(env_buf));
+  strlcat(buf[0], voyeur_libs, sizeof(env_buf));
   if (existing_dyld_insert) {
-    strlcat(dyld_insert_libraries_env, ":", ENV_VAR_SIZE);
-    strlcat(dyld_insert_libraries_env, existing_dyld_insert, ENV_VAR_SIZE);
+    strlcat(buf[0], ":", sizeof(env_buf));
+    strlcat(buf[0], existing_dyld_insert, sizeof(env_buf));
   }
-  printf("Final env var is %s\n", dyld_insert_libraries_env);
+  printf("Final env var is %s\n", buf[0]);
 
-  char* libvoyeur_libs_env = malloc(ENV_VAR_SIZE);
-  strlcpy(libvoyeur_libs_env, "LIBVOYEUR_LIBS=", ENV_VAR_SIZE);
-  strlcat(libvoyeur_libs_env, voyeur_libs, ENV_VAR_SIZE);
+  strlcpy(buf[1], "LIBVOYEUR_LIBS=", sizeof(env_buf));
+  strlcat(buf[1], voyeur_libs, sizeof(env_buf));
 
-  char* libvoyeur_opts_env = malloc(ENV_VAR_SIZE);
-  strlcpy(libvoyeur_opts_env, "LIBVOYEUR_OPTS=", ENV_VAR_SIZE);
-  strlcat(libvoyeur_opts_env, voyeur_opts, ENV_VAR_SIZE);
+  strlcpy(buf[2], "LIBVOYEUR_OPTS=", sizeof(env_buf));
+  strlcat(buf[2], voyeur_opts, sizeof(env_buf));
 
-  char* libvoyeur_socket_env = malloc(ENV_VAR_SIZE);
-  strlcpy(libvoyeur_socket_env, "LIBVOYEUR_SOCKET=", ENV_VAR_SIZE);
-  strlcat(libvoyeur_socket_env, sockpath, ENV_VAR_SIZE);
+  strlcpy(buf[3], "LIBVOYEUR_SOCKET=", sizeof(env_buf));
+  strlcat(buf[3], sockpath, sizeof(env_buf));
 
   // Allocate a new environment, including additional space for the 4
   // extra environment variables we'll add and a terminating NULL.
   char** newenvp = malloc(sizeof(char*) * (envlen + 5));
   memcpy(newenvp, envp, sizeof(char*) * envlen);
-  newenvp[envlen]     = dyld_insert_libraries_env;
-  newenvp[envlen + 1] = libvoyeur_libs_env;
-  newenvp[envlen + 2] = libvoyeur_opts_env;
-  newenvp[envlen + 3] = libvoyeur_socket_env;
+  newenvp[envlen + 0] = buf[0];
+  newenvp[envlen + 1] = buf[1];
+  newenvp[envlen + 2] = buf[2];
+  newenvp[envlen + 3] = buf[3];
   newenvp[envlen + 4] = NULL;
 
   return newenvp;

@@ -19,6 +19,12 @@
 #include "net.h"
 #include "util.h"
 
+typedef struct {
+  struct sockaddr_un sockinfo;
+  int server_sock;
+  void* env_buf;
+} server_state;
+
 voyeur_context_t voyeur_context_create()
 {
   voyeur_context* ctx = calloc(1, sizeof(voyeur_context));
@@ -27,7 +33,15 @@ voyeur_context_t voyeur_context_create()
 
 void voyeur_context_destroy(voyeur_context_t ctx)
 {
-  free((voyeur_context*) ctx);
+  voyeur_context* context = (voyeur_context*) ctx;
+
+  if (context->server_state) {
+    server_state* state = (server_state*) context->server_state;
+    free(state->env_buf);
+    free(state);
+  }
+  
+  free(context);
 }
 
 typedef struct {
@@ -45,6 +59,7 @@ void* waitpid_thread(void* arg_ptr)
   voyeur_write_int(arg->child_pipe_input, status);
 
   close(arg->child_pipe_input);
+  free(arg);
   return NULL;
 }
 
@@ -85,11 +100,7 @@ int accept_connection(int server_sock)
 
   int client_sock =
     accept(server_sock, (struct sockaddr *) &client_info, &client_info_len);
-
-  if (client_sock < 0) {
-    perror("accept");
-    exit(EXIT_FAILURE);
-  }
+  CHECK(client_sock, "accept");
 
   printf("Client %d connected.\n", client_sock);
   
@@ -150,14 +161,40 @@ int run_server(voyeur_context* context,
 
 char** voyeur_prepare(voyeur_context_t ctx, char* const envp[])
 {
-  exit(EXIT_FAILURE);
-  return NULL;
+  voyeur_context* context = (voyeur_context*) ctx;
+  server_state* state = calloc(1, sizeof(server_state));
+  context->server_state = (void*) state;
+
+  // Prepare the server. We need to do this in advance both to avoid
+  // racing and so that we can include the socket path in the
+  // environment variables.
+  state->server_sock = voyeur_create_server_socket(&state->sockinfo);
+  
+  // Add libvoyeur-specific environment variables.
+  char* libs = voyeur_requested_libs(context);
+  char* opts = voyeur_requested_opts(context);
+  char** voyeur_envp = voyeur_augment_environment(envp, libs, opts,
+                                                  state->sockinfo.sun_path,
+                                                  &state->env_buf);
+
+  return voyeur_envp;
 }
 
 int voyeur_start(voyeur_context_t ctx, pid_t child_pid)
 {
-  exit(EXIT_FAILURE);
-  return -1;
+  voyeur_context* context = (voyeur_context*) ctx;
+  server_state* state = (server_state*) context->server_state;
+
+  // Run the server.
+  int child_pipe_output = start_waitpid_thread(child_pid);
+  int res = run_server(context,
+                       state->server_sock,
+                       child_pipe_output);
+
+  // Clean up the socket file.
+  TRY(unlink, state->sockinfo.sun_path);
+
+  return res;
 }
 
 int voyeur_exec(voyeur_context_t ctx,
@@ -165,32 +202,16 @@ int voyeur_exec(voyeur_context_t ctx,
                 char* const argv[],
                 char* const envp[])
 {
-  struct sockaddr_un sockinfo;
-  voyeur_context* context = (voyeur_context*) ctx;
-
-  // Prepare the server. We need to do this in advance both to avoid
-  // racing and so that we can include the socket path in the
-  // environment variables.
-  int server_sock = voyeur_create_server_socket(&sockinfo);
+  char** voyeur_envp = voyeur_prepare(ctx, envp);
   
   pid_t child_pid;
   if ((child_pid = fork()) == 0) {
-    // Add libvoyeur-specific environment variables.
-    char* libs = voyeur_requested_libs(context);
-    char* opts = voyeur_requested_opts(context);
-    char** newenvp = voyeur_augment_environment(envp, libs, opts, sockinfo.sun_path);
-
     // Run the child process. This will never return.
-    run_child(path, argv, newenvp);
+    run_child(path, argv, voyeur_envp);
     return 0;
   } else {
     // Run the server.
-    int child_pipe_output = start_waitpid_thread(child_pid);
-    int res = run_server(context, server_sock, child_pipe_output);
-
-    // Clean up the socket file.
-    TRY(unlink, sockinfo.sun_path);
-
-    return res;
+    free(voyeur_envp);
+    return voyeur_start(ctx, child_pid);
   }
 }

@@ -22,8 +22,8 @@ typedef enum {
 } voyeur_event_type;
 #undef ON_EVENT
 
-// Define the voyeur_context type, which is really just a container
-// for event options and callbacks.
+// Define the voyeur_context type, which is primarily a container for
+// event options and callbacks.
 #define ON_EVENT(_, e)                          \
   uint8_t e##_opts;                             \
   void* e##_cb;                                 \
@@ -31,6 +31,8 @@ typedef enum {
 
 typedef struct {
   MAP_EVENTS
+
+  void* server_state;
 } voyeur_context;
 
 #undef ON_EVENT

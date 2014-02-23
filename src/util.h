@@ -9,4 +9,12 @@
     }                                           \
   } while (0)
 
+#define CHECK(_var, _err)                       \
+  do {                                          \
+    if (_var < 0) {                             \
+      perror(_err);                             \
+      exit(EXIT_FAILURE);                       \
+    }                                           \
+  } while (0)
+
 #endif

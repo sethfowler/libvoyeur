@@ -74,11 +74,15 @@ int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[]
   // exec fails, generally the fork'd process will just bail.)
   close(sock);
 
-  // Add libvoyeur-specific environment variables.
-  char** newenvp = voyeur_augment_environment(envp, libs, opts, sockpath);
+  // Add libvoyeur-specific environment variables. (We don't bother
+  // freeing 'buf' since we need it until the execve call and we have
+  // no way of freeing it after that.)
+  void* buf;
+  char** voyeur_envp = voyeur_augment_environment(envp, libs, opts,
+                                                  sockpath, &buf);
 
   // Pass through the call to the real execve.
   VOYEUR_DECLARE_NEXT(execve_fptr_t, execve);
   VOYEUR_LOOKUP_NEXT(execve_fptr_t, execve);
-  return VOYEUR_CALL_NEXT(execve, path, argv, newenvp);
+  return VOYEUR_CALL_NEXT(execve, path, argv, voyeur_envp);
 }
