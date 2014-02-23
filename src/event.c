@@ -134,27 +134,36 @@ void voyeur_handle_event(voyeur_context* context, voyeur_event_type type, int fd
 
 #undef ON_EVENT
 
-#define LIBS_SIZE 256
-
 #ifdef __APPLE__
 #define LIB_SUFFIX ".dylib"
 #else
 #define LIB_SUFFIX ".so"
 #endif
 
+#define ON_EVENT(_, e)           \
+  "libvoyeur-" #e LIB_SUFFIX ":" \
+
+static size_t compute_libs_size(size_t libdir_size)
+{
+  static char all_libs[] =
+    MAP_EVENTS
+    ;
+
+  return sizeof(all_libs) + VOYEUR_EVENT_MAX * libdir_size;
+}
+
+#undef ON_EVENT
+
 #define ON_EVENT(_, e)                                    \
   if (context->e##_cb) {                                  \
-    if (prev) strlcat(libs, ":", LIBS_SIZE);              \
-    strlcat(libs, libdir, LIBS_SIZE);                     \
-    strlcat(libs, "libvoyeur-" #e LIB_SUFFIX, LIBS_SIZE); \
+    if (prev) strlcat(libs, ":", libs_size);              \
+    strlcat(libs, libdir, libs_size);                     \
+    strlcat(libs, "libvoyeur-" #e LIB_SUFFIX, libs_size); \
     prev = 1;                                             \
   }                                                       \
 
 char* voyeur_requested_libs(voyeur_context* context)
 {
-  char* libs = calloc(1, LIBS_SIZE);
-  char prev = 0;
-  
   bool did_allocate = false;
   char* libdir = "./";
   Dl_info dlinfo;
@@ -171,6 +180,10 @@ char* voyeur_requested_libs(voyeur_context* context)
     }
   }
 
+  size_t libs_size = compute_libs_size(strnlen(libdir, 4096));
+  char* libs = calloc(1, libs_size);
+  char prev = 0;
+  
   MAP_EVENTS
 
   if (did_allocate) {
