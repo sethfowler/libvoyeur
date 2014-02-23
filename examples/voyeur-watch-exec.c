@@ -7,6 +7,8 @@ void exec_callback(const char* path,
                    char* const argv[],
                    char* const envp[],
                    const char* cwd,
+                   pid_t pid,
+                   pid_t ppid,
                    void* userdata)
 {
   fprintf(stderr, "[EXEC] %s", path);
@@ -16,7 +18,8 @@ void exec_callback(const char* path,
       fprintf(stderr, " %s", argv[i]);
   }
 
-  fprintf(stderr, " (in %s)\n", cwd);
+  fprintf(stderr, " (in %s) (pid %u) (ppid %u)\n",
+          cwd, (unsigned) pid, (unsigned) ppid);
 }
 
 void go(int argc, char** argv)

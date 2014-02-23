@@ -44,6 +44,7 @@ int VOYEUR_FUNC(close)(int fildes)
   voyeur_write_event_type(voyeur_close_sock, VOYEUR_EVENT_CLOSE);
   voyeur_write_int(voyeur_close_sock, fildes);
   voyeur_write_int(voyeur_close_sock, retval);
+  voyeur_write_pid(voyeur_close_sock, getpid());
 
   pthread_mutex_unlock(&voyeur_close_mutex);
 

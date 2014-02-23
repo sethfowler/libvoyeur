@@ -20,43 +20,25 @@ void exec_callback(const char* path,
                    char* const argv[],
                    char* const envp[],
                    const char* cwd,
+                   pid_t pid,
+                   pid_t ppid,
                    void* userdata)
 {
-  printf("exec_callback called for path [%s]\n", path);
+  printf("[EXEC] %s", path);
 
-  for (int i = 0 ; argv[i] ; ++i)
-    printf("arg[%d] = %s\n", i, argv[i]);
-
-  if (envp) {
-    for (int i = 0 ; envp[i] ; ++i)
-      printf("env[%d] = %s\n", i, envp[i]);
+  if (argv[0] != NULL) {
+    for (int i = 1 ; argv[i] ; ++i)
+      printf(" %s", argv[i]);
   }
 
-  if (cwd)
-    printf("cwd = %s\n", cwd);
-
-  char* result = (char*) userdata;
-  *result = 1;
-}
-
-void exec_recursive_callback(const char* path,
-                             char* const argv[],
-                             char* const envp[],
-                             const char* cwd,
-                             void* userdata)
-{
-  printf("exec_callback called for path [%s]\n", path);
-
-  for (int i = 0 ; argv[i] ; ++i)
-    printf("arg[%d] = %s\n", i, argv[i]);
+  printf(" (in %s) (pid %u) (ppid %u)\n",
+         cwd ? cwd : "?", (unsigned) pid, (unsigned) ppid);
 
   if (envp) {
+    printf("  environment:\n");
     for (int i = 0 ; envp[i] ; ++i)
-      printf("env[%d] = %s\n", i, envp[i]);
+      printf("    %s\n", envp[i]);
   }
-
-  if (cwd)
-    printf("cwd = %s\n", cwd);
 
   unsigned* result = (unsigned*) userdata;
   *result += 1;
@@ -67,19 +49,21 @@ void open_callback(const char* path,
                    mode_t mode,
                    const char* cwd,
                    int retval,
+                   pid_t pid,
                    void* userdata)
 {
   printf("open_callback called for path [%s] oflag [%d] mode [%o] "
-         "cwd [%s] rv [%d]\n",
-         path, oflag, (int) mode, cwd ? cwd : "", retval);
+         "cwd [%s] rv [%d] pid [%u]\n",
+         path, oflag, (int) mode, cwd ? cwd : "", retval, (unsigned) pid);
 
   char* result = (char*) userdata;
   *result = 1;
 }
 
-void close_callback(int fd, int retval, void* userdata)
+void close_callback(int fd, int retval, pid_t pid, void* userdata)
 {
-  printf("close_callback called for fd [%d] retval [%d]\n", fd, retval);
+  printf("close_callback called for fd [%d] rv [%d] pid [%u]\n",
+         fd, retval, pid);
 
   char* result = (char*) userdata;
   *result = 1;
@@ -107,7 +91,7 @@ void test_exec_recursive()
 {
   unsigned result = 0;
   voyeur_context_t ctx = voyeur_context_create();
-  voyeur_observe_exec(ctx, OBSERVE_EXEC_DEFAULT, exec_recursive_callback, (void*) &result);
+  voyeur_observe_exec(ctx, OBSERVE_EXEC_DEFAULT, exec_callback, (void*) &result);
 
   char* path   = "./test-exec-recursive";
   char* argv[] = { path, NULL };
@@ -177,7 +161,7 @@ void test_exec_variants()
 {
   unsigned result = 0;
   voyeur_context_t ctx = voyeur_context_create();
-  voyeur_observe_exec(ctx, OBSERVE_EXEC_DEFAULT, exec_recursive_callback, (void*) &result);
+  voyeur_observe_exec(ctx, OBSERVE_EXEC_DEFAULT, exec_callback, (void*) &result);
 
   char* path   = "./test-exec-variants";
   char* argv[] = { path, NULL };

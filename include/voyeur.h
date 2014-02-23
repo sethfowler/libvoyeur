@@ -39,6 +39,7 @@
 // and voyeur_start() rather than voyeur_exec(). Their documentation
 // is below.
 
+
 //////////////////////////////////////////////////
 // Creating and destroying libvoyeur contexts.
 //////////////////////////////////////////////////
@@ -64,6 +65,8 @@ typedef void (*voyeur_exec_callback)(const char* path,
                                      char* const argv[],
                                      char* const envp[],
                                      const char* cwd,
+                                     pid_t pid,
+                                     pid_t ppid,
                                      void* userdata);
 typedef enum {
   OBSERVE_EXEC_DEFAULT  = 0,
@@ -83,6 +86,7 @@ typedef void (*voyeur_open_callback)(const char* path,
                                      mode_t mode,
                                      const char* cwd,
                                      int retval,
+                                     pid_t pid,
                                      void* userdata);
 typedef enum {
   OBSERVE_OPEN_DEFAULT = 0,
@@ -96,6 +100,7 @@ void voyeur_observe_open(voyeur_context_t ctx,
 // Observing close() calls.
 typedef void (*voyeur_close_callback)(int fd,
                                       int retval,
+                                      pid_t pid,
                                       void* userdata);
 typedef enum {
   OBSERVE_CLOSE_DEFAULT = 0,

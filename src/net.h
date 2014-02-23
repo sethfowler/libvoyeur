@@ -3,8 +3,27 @@
 
 #include <stddef.h>
 #include <sys/un.h>
+#include <unistd.h>
 
 #include "event.h"
+
+//////////////////////////////////////////////////
+// Sock creation and connection.
+//////////////////////////////////////////////////
+
+// Creates a socket and starts listening on it. The caller must
+// provided an uninitialized sockaddr_un struct. After
+// create_server_socket returns, the socket path will be available
+// in sockinfo->sun_path.
+int voyeur_create_server_socket(struct sockaddr_un* sockinfo);
+
+// Creates a socket and connects to the provided socket path on it.
+int voyeur_create_client_socket(const char* sockpath);
+
+
+//////////////////////////////////////////////////
+// Event serialization.
+//////////////////////////////////////////////////
 
 // All libvoyeur events consist of an event type followed by a
 // sequence of bytes, integers, and strings particular to the event.
@@ -38,6 +57,10 @@ int voyeur_read_int(int fd, int* val);
 int voyeur_write_size(int fd, size_t val);
 int voyeur_read_size(int fd, size_t* val);
 
+// Reader and writer for pid_t.
+int voyeur_write_pid(int fd, pid_t val);
+int voyeur_read_pid(int fd, pid_t* val);
+
 #define VOYEUR_MAX_STRLEN 4096
 
 // Write a string. If 'len' is 0, the length is determined by calling
@@ -53,15 +76,5 @@ int voyeur_write_string(int fd, const char* val, size_t len);
 // sure to use the same limit when writing. If there isn't enough
 // space in the buffer, voyeur_read_string will report an error.
 int voyeur_read_string(int fd, char** val, size_t maxlen);
-
-
-// Creates a socket and starts listening on it. The caller must
-// provided an uninitialized sockaddr_un struct. After
-// create_server_socket returns, the socket path will be available
-// in sockinfo->sun_path.
-int voyeur_create_server_socket(struct sockaddr_un* sockinfo);
-
-// Creates a socket and connects to the provided socket path on it.
-int voyeur_create_client_socket(const char* sockpath);
 
 #endif

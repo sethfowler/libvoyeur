@@ -76,6 +76,8 @@ int VOYEUR_FUNC(open)(const char* path, int oflag, ...)
     free(cwd);
   }
 
+  voyeur_write_pid(voyeur_open_sock, getpid());
+
   pthread_mutex_unlock(&voyeur_open_mutex);
 
   return retval;

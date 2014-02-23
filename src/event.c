@@ -54,8 +54,15 @@ static void handle_exec(voyeur_context* context, int fd)
     TRY(voyeur_read_string, fd, &cwd, 0);
   }
 
+  // Read the pid and ppid.
+  pid_t pid, ppid;
+  TRY(voyeur_read_pid, fd, &pid);
+  TRY(voyeur_read_pid, fd, &ppid);
+
   if (context->exec_cb) {
-    ((voyeur_exec_callback)context->exec_cb)(path, argv, envp, cwd,
+    ((voyeur_exec_callback)context->exec_cb)(path, argv,
+                                             envp, cwd,
+                                             pid, ppid,
                                              context->exec_userdata);
   }
 
@@ -83,21 +90,25 @@ static void handle_open(voyeur_context* context, int fd)
 {
   char* path;
   int oflag, mode, retval;
+  char* cwd = NULL;
+  pid_t pid;
 
   TRY(voyeur_read_string, fd, &path, 0);
   TRY(voyeur_read_int, fd, &oflag);
   TRY(voyeur_read_int, fd, &mode);
   TRY(voyeur_read_int, fd, &retval);
 
-  // Read the current working directory.
-  char* cwd = NULL;
   if (context->open_opts & OBSERVE_OPEN_CWD) {
     TRY(voyeur_read_string, fd, &cwd, 0);
   }
 
+  TRY(voyeur_read_pid, fd, &pid);
+
   if (context->open_cb) {
-    ((voyeur_open_callback)context->open_cb)(path, oflag, (mode_t) mode, cwd,
-                                             retval, context->open_userdata);
+    ((voyeur_open_callback)context->open_cb)(path, oflag,
+                                             (mode_t) mode,
+                                             cwd, retval, pid,
+                                             context->open_userdata);
   }
 
   free(path);
@@ -106,12 +117,14 @@ static void handle_open(voyeur_context* context, int fd)
 static void handle_close(voyeur_context* context, int fd)
 {
   int fildes, retval;
+  pid_t pid;
 
   TRY(voyeur_read_int, fd, &fildes);
   TRY(voyeur_read_int, fd, &retval);
+  TRY(voyeur_read_pid, fd, &pid);
 
   if (context->close_cb) {
-    ((voyeur_close_callback)context->close_cb)(fildes, retval,
+    ((voyeur_close_callback)context->close_cb)(fildes, retval, pid,
                                                context->close_userdata);
   }
 }

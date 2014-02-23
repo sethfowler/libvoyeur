@@ -13,8 +13,9 @@
 #include "net.h"
 
 
-void voyeur_write_exec_event(int sock, uint8_t options, const char* path,
-                             char* const argv[], char* const envp[])
+static void write_exec_event(int sock, uint8_t options, const char* path,
+                             char* const argv[], char* const envp[],
+                             pid_t pid, pid_t ppid)
 {
   if (!(options & OBSERVE_EXEC_NOACCESS)) {
     // Make sure this exec() call could succeed before reporting the event.
@@ -49,6 +50,9 @@ void voyeur_write_exec_event(int sock, uint8_t options, const char* path,
   if (options & OBSERVE_EXEC_CWD) {
     voyeur_write_string(sock, getcwd(NULL, 0), 0);
   }
+
+  voyeur_write_pid(sock, pid);
+  voyeur_write_pid(sock, ppid);
 }
 
 //////////////////////////////////////////////////
@@ -77,7 +81,7 @@ int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[]
 
   // Write the event to the socket.
   int sock = voyeur_create_client_socket(sockpath);
-  voyeur_write_exec_event(sock, options, path, argv, envp);
+  write_exec_event(sock, options, path, argv, envp, getpid(), getppid());
 
   // We might as well close the socket since there's no chance we'll
   // ever be called a second time by the same process. (Even if the
@@ -88,8 +92,8 @@ int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[]
   // freeing 'buf' since we need it until the execve call and we have
   // no way of freeing it after that.)
   void* buf;
-  char** voyeur_envp = voyeur_augment_environment(envp, libs, opts,
-                                                  sockpath, &buf);
+  char** voyeur_envp =
+    voyeur_augment_environment(envp, libs, opts, sockpath, &buf);
 
   // Pass through the call to the real execve.
   VOYEUR_DECLARE_NEXT(execve_fptr_t, execve);
@@ -146,13 +150,6 @@ int VOYEUR_FUNC(posix_spawn)(pid_t* pid,
     voyeur_posix_spawn_initialized = 1;
   }
 
-  // Write the event to the socket.
-  voyeur_write_exec_event(voyeur_posix_spawn_sock,
-                          voyeur_posix_spawn_options,
-                          path, argv, envp);
-
-  pthread_mutex_unlock(&voyeur_posix_spawn_mutex);
-
   // Add libvoyeur-specific environment variables.
   void* buf;
   char** voyeur_envp =
@@ -165,13 +162,28 @@ int VOYEUR_FUNC(posix_spawn)(pid_t* pid,
   // Pass through the call to the real execve.
   VOYEUR_DECLARE_NEXT(posix_spawn_fptr_t, posix_spawn);
   VOYEUR_LOOKUP_NEXT(posix_spawn_fptr_t, posix_spawn);
-  int retval = VOYEUR_CALL_NEXT(posix_spawn, pid, path,
+  pid_t child_pid;
+  int retval = VOYEUR_CALL_NEXT(posix_spawn, &child_pid, path,
                                 file_actions, attrp,
                                 argv, voyeur_envp);
+
+  // Write the event to the socket.
+  write_exec_event(voyeur_posix_spawn_sock,
+                   voyeur_posix_spawn_options,
+                   path, argv, envp,
+                   child_pid, getpid());
+
+  pthread_mutex_unlock(&voyeur_posix_spawn_mutex);
 
   // Free the resources we allocated.
   free(voyeur_envp);
   free(buf);
+
+  // It's legal to pass NULL for the pid argument, so double-check we
+  // have somewhere to write the pid to before doing it.
+  if (pid) {
+    *pid = child_pid;
+  }
 
   return retval;
 }
