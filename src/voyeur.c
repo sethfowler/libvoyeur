@@ -102,7 +102,7 @@ int accept_connection(int server_sock)
     accept(server_sock, (struct sockaddr *) &client_info, &client_info_len);
   CHECK(client_sock, "accept");
 
-  printf("Client %d connected.\n", client_sock);
+  //printf("Client %d connected.\n", client_sock);
   
   return client_sock;
 }
@@ -138,7 +138,7 @@ int run_server(voyeur_context* context,
           // Got a voyeur event; dispatch to the appropriate handler.
           voyeur_event_type type;
           if (voyeur_read_event_type(fd, &type) < 0) {
-            printf("Client %d disconnected.\n", fd);
+            //printf("Client %d disconnected.\n", fd);
             close(fd);
             FD_CLR(fd, &active_fd_set);
           } else {

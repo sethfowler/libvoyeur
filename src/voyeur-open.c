@@ -30,7 +30,8 @@ int VOYEUR_FUNC(open)(const char* path, int oflag, ...)
   
   if (!voyeur_open_initialized) {
     const char* voyeur_open_sockpath = getenv("LIBVOYEUR_SOCKET");
-    voyeur_open_opts = voyeur_decode_options(getenv("LIBVOYEUR_OPTS"), 1);
+    voyeur_open_opts = voyeur_decode_options(getenv("LIBVOYEUR_OPTS"),
+                                             VOYEUR_EVENT_OPEN);
     voyeur_open_sock = voyeur_create_client_socket(voyeur_open_sockpath);
     VOYEUR_LOOKUP_NEXT(open_fptr_t, open);
     voyeur_open_initialized = 1;

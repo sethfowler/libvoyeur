@@ -29,4 +29,4 @@ directory as `libvoyeur`.
 
 The public API is documented in [voyeur.h](include/voyeur.h).
 
-For more examples, the tests in [voyeur-test.c](test/voyeur-test.c) might be useful.
+The [examples](examples/) directory contains some sample programs built using `libvoyeur`.

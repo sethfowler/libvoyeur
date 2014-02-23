@@ -30,7 +30,8 @@ int VOYEUR_FUNC(close)(int fildes)
 
   if (!voyeur_close_initialized) {
     const char* voyeur_close_sockpath = getenv("LIBVOYEUR_SOCKET");
-    voyeur_close_opts = voyeur_decode_options(getenv("LIBVOYEUR_OPTS"), 1);
+    voyeur_close_opts = voyeur_decode_options(getenv("LIBVOYEUR_OPTS"),
+                                              VOYEUR_EVENT_CLOSE);
     voyeur_close_sock = voyeur_create_client_socket(voyeur_close_sockpath);
     VOYEUR_LOOKUP_NEXT(close_fptr_t, close);
     voyeur_close_initialized = 1;

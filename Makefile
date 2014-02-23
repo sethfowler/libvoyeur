@@ -1,7 +1,8 @@
 LIBNAMES=libvoyeur libvoyeur-exec libvoyeur-open libvoyeur-close
-TESTNAMES=test-exec test-exec-recursive test-open test-exec-and-open test-open-and-close
+TESTNAMES=test-exec test-exec-recursive test-open test-exec-and-open test-open-and-close test-exec-variants
 TESTHARNESSNAME=voyeur-test
 LIBNULLNAME=libnull
+EXAMPLENAMES=voyeur-watch-exec
 
 CC=clang
 CFLAGS=-I./include -g
@@ -24,8 +25,10 @@ LIBS=$(addprefix build/, $(addsuffix .$(LIBSUFFIX), $(LIBNAMES)))
 TESTS=$(addprefix build/, $(TESTNAMES))
 TESTHARNESS=$(addprefix build/, $(TESTHARNESSNAME))
 LIBNULL=$(addprefix build/, $(addsuffix .$(LIBSUFFIX), $(LIBNULLNAME)))
+EXAMPLES=$(addprefix build/, $(EXAMPLENAMES))
+BUILDDIR=$(realpath build/)
 
-.PHONY: default check clean
+.PHONY: default check examples clean
 
 default: build $(LIBS)
 
@@ -37,7 +40,7 @@ $(OBJECTS): build/%.o : src/%.c $(HEADERS)
 
 $(LIBS): build/lib%.$(LIBSUFFIX) : build/%.o build/net.o build/env.o build/event.o
 ifeq ($(UNAME), Darwin)
-	$(CC) $(CFLAGS) $^ -dynamiclib -install_name lib$*.$(LIBSUFFIX) -o $@
+	$(CC) $(CFLAGS) $^ -dynamiclib -install_name $(BUILDDIR)/lib$*.$(LIBSUFFIX) -o $@
 else
 	$(CC) $(CFLAGS) $^ -shared -Wl,-soname,lib$*.$(LIBSUFFIX) -o $@ -ldl
 endif
@@ -57,9 +60,18 @@ $(TESTS): build/% : test/%.c $(LIBS)
 
 $(LIBNULL): build/%.$(LIBSUFFIX) : test/%.c
 ifeq ($(UNAME), Darwin)
-	$(CC) $(CFLAGS) $^ -dynamiclib -install_name $*.$(LIBSUFFIX) -o $@
+	$(CC) $(CFLAGS) $^ -dynamiclib -install_name $(BUILDDIR)/$*.$(LIBSUFFIX) -o $@
 else
 	$(CC) $(CFLAGS) $^ -shared -Wl,-soname,$*.$(LIBSUFFIX) -o $@
+endif
+
+examples: default $(EXAMPLES)
+
+$(EXAMPLES): build/% : examples/%.c $(HEADERS)
+ifeq ($(UNAME), Darwin)
+	$(CC) $(CFLAGS) -Lbuild -lvoyeur $< -o $@
+else
+	$(CC) $(CFLAGS) -Lbuild -lvoyeur -Wl,-rpath '-Wl,$$ORIGIN' $< -o $@
 endif
 
 clean:

@@ -27,7 +27,6 @@ char** voyeur_augment_environment(char* const* envp,
   unsigned envlen = 0;
   char* existing_dyld_insert = NULL;
   for ( ; envp[envlen] != NULL ; ++envlen) {
-    printf("Comparing [%s] and [%s]\n", envp[envlen], INSERT_LIBS);
     if (strncmp(envp[envlen], INSERT_LIBS, sizeof(INSERT_LIBS) - 1) == 0) {
       existing_dyld_insert = envp[envlen] +
                              sizeof(INSERT_LIBS) - 1;
@@ -44,7 +43,6 @@ char** voyeur_augment_environment(char* const* envp,
     strlcat(buf[0], ":", sizeof(env_buf));
     strlcat(buf[0], existing_dyld_insert, sizeof(env_buf));
   }
-  printf("Final env var is %s\n", buf[0]);
 
   strlcpy(buf[1], "LIBVOYEUR_LIBS=", sizeof(env_buf));
   strlcat(buf[1], voyeur_libs, sizeof(env_buf));

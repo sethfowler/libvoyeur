@@ -84,6 +84,7 @@ void close_callback(int fd, int retval, void* userdata)
   char* result = (char*) userdata;
   *result = 1;
 }
+
 void test_exec()
 {
   char result = 0;
@@ -172,6 +173,26 @@ void test_open_and_close()
   voyeur_context_destroy(ctx);
 }
 
+void test_exec_variants()
+{
+  unsigned result = 0;
+  voyeur_context_t ctx = voyeur_context_create();
+  voyeur_observe_exec(ctx, OBSERVE_EXEC_DEFAULT, exec_recursive_callback, (void*) &result);
+
+  char* path   = "./test-exec-variants";
+  char* argv[] = { path, NULL };
+  char* envp[] = { NULL };
+
+  print_test_header("exec-variants");
+  voyeur_exec(ctx, path, argv, envp);
+
+  // The expected result is 11 even though there are only 10 variants
+  // because 'system' spawns a 'sh' process to do the real work.
+  print_test_footer(result == 11);
+
+  voyeur_context_destroy(ctx);
+}
+
 int main(int argc, char** argv)
 {
   test_exec();
@@ -179,5 +200,6 @@ int main(int argc, char** argv)
   test_open();
   test_exec_and_open();
   test_open_and_close();
+  test_exec_variants();
   return 0;
 }
