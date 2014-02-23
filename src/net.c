@@ -144,14 +144,13 @@ int voyeur_read_string(int fd, char** val, size_t maxlen)
 int voyeur_create_server_socket(struct sockaddr_un* sockinfo)
 {
   // Configure a unix domain socket at a temporary path.
-  // TODO: Switch to using mkdtemp and placing the socket
-  // inside this directory.
+  char sockdir[] = "/tmp/libvoyeur-XXXXXXXXX";
+  mkdtemp(sockdir);
+  
   memset(sockinfo, 0, sizeof(struct sockaddr_un));
   sockinfo->sun_family = AF_UNIX;
-  strncpy(sockinfo->sun_path,
-          "/tmp/voyeur-socket-XXXXXXXXX",
-          sizeof(sockinfo->sun_path) - 1);
-  mktemp(sockinfo->sun_path);
+  strlcpy(sockinfo->sun_path, sockdir, sizeof(sockinfo->sun_path));
+  strlcat(sockinfo->sun_path, "/socket", sizeof(sockinfo->sun_path));
   unlink(sockinfo->sun_path);
 
   // Start the server.

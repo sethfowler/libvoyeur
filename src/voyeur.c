@@ -193,6 +193,11 @@ int voyeur_start(voyeur_context_t ctx, pid_t child_pid)
 
   // Clean up the socket file.
   TRY(unlink, state->sockinfo.sun_path);
+  char* last_slash = strrchr(state->sockinfo.sun_path, '/');
+  if (last_slash) {
+    *last_slash = '\0';
+  }
+  TRY(rmdir, state->sockinfo.sun_path);
 
   return res;
 }
