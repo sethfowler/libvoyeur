@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <pthread.h>
+#include <spawn.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -79,18 +80,6 @@ int start_waitpid_thread(pid_t child_pid)
   pthread_detach(thread);
 
   return waitpid_pipe[0];
-}
-
-void run_child(const char* path,
-               char* const argv[],
-               char* const envp[])
-{
-  // Start the requested process. Normally this never returns.
-  execve(path, argv, envp);
-
-  // If execve *did* return, something bad happened.
-  perror("execve");
-  _exit(EXIT_FAILURE);
 }
 
 int accept_connection(int server_sock)
@@ -210,13 +199,12 @@ int voyeur_exec(voyeur_context_t ctx,
   char** voyeur_envp = voyeur_prepare(ctx, envp);
   
   pid_t child_pid;
-  if ((child_pid = fork()) == 0) {
-    // Run the child process. This will never return.
-    run_child(path, argv, voyeur_envp);
-    return 0;
-  } else {
-    // Run the server.
+  if (posix_spawnp(&child_pid, path, NULL, NULL, argv, voyeur_envp) != 0) {
     free(voyeur_envp);
-    return voyeur_start(ctx, child_pid);
+    return -1;
   }
+  
+  int retval = voyeur_start(ctx, child_pid);
+  free(voyeur_envp);
+  return retval;
 }

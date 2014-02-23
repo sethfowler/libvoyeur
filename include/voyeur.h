@@ -113,7 +113,9 @@ void voyeur_observe_close(voyeur_context_t ctx,
 // This will acquire resources that libvoyeur needs to do its work and
 // create a modified environment, based upon the provided template,
 // that should be passed to the child process when it gets exec'd.
-// It's the caller's responsibility to free this environment.
+// It's the caller's responsibility to free this environment. (Note
+// that unlike other resources acquired by libvoyeur, the environment
+// is not freed when voyeur_context_destroy() is called.)
 //
 // This function should be called before forking. After calling
 // voyeur_prepare(), it isn't safe to call voyeur_observe_* functions
@@ -138,12 +140,9 @@ int voyeur_start(voyeur_context_t ctx, pid_t child_pid);
 // you had made this sequence of calls:
 //
 // > voyeur_envp = voyeur_prepare(ctx, envp);
-// > if ((pid = fork()) == 0) {
-// >   execve(path, argv, voyeur_envp);
-// > } else {
-// >   free(voyeur_envp);
-// >   return voyeur_start(ctx, pid);
-// > }
+// > posix_spawn(&pid, path, NULL, NULL, argv, voyeur_envp);
+// > voyeur_start(ctx, pid);
+// > free(voyeur_envp);
 //
 // Like voyeur_start(), it returns the exit status of the child. After
 // voyeur_exec() returns, you should use voyeur_context_destroy() to
