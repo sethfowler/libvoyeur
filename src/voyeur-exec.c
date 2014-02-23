@@ -12,32 +12,16 @@
 #include "env.h"
 #include "net.h"
 
-//////////////////////////////////////////////////
-// execve
-//////////////////////////////////////////////////
 
-typedef int (*execve_fptr_t)(const char*, char* const[], char* const []);
-
-int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[]);
-VOYEUR_INTERPOSE(execve)
-
-int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[])
+void voyeur_write_exec_event(int sock, uint8_t options, const char* path,
+                             char* const argv[], char* const envp[])
 {
-  // In the case of exec we don't bother caching anything, since exec
-  // will wipe out this whole process image anyway.
-  const char* libs = getenv("LIBVOYEUR_LIBS");
-  const char* opts = getenv("LIBVOYEUR_OPTS");
-  uint8_t options = voyeur_decode_options(opts, VOYEUR_EVENT_EXEC);
-  const char* sockpath = getenv("LIBVOYEUR_SOCKET");
-
-  /*
-  printf("LIBVOYEUR_LIBS = %s\n", libs ? libs : "NULL");
-  printf("LIBVOYEUR_OPTS = %s\n", opts ? opts : "NULL");
-  printf("LIBVOYEUR_SOCKET = %s\n", sockpath ? sockpath : "NULL");
-  */
-
-  // Write the event to the socket.
-  int sock = voyeur_create_client_socket(sockpath);
+  if (!(options & OBSERVE_EXEC_NOACCESS)) {
+    // Make sure this exec() call could succeed before reporting the event.
+    if (access(path, X_OK) < 0) {
+      return;
+    }
+  }
 
   voyeur_write_event_type(sock, VOYEUR_EVENT_EXEC);
   voyeur_write_string(sock, path, 0);
@@ -65,6 +49,35 @@ int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[]
   if (options & OBSERVE_EXEC_CWD) {
     voyeur_write_string(sock, getcwd(NULL, 0), 0);
   }
+}
+
+//////////////////////////////////////////////////
+// execve
+//////////////////////////////////////////////////
+
+typedef int (*execve_fptr_t)(const char*, char* const[], char* const []);
+
+int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[]);
+VOYEUR_INTERPOSE(execve)
+
+int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[])
+{
+  // In the case of exec we don't bother caching anything, since exec
+  // will wipe out this whole process image anyway.
+  const char* libs = getenv("LIBVOYEUR_LIBS");
+  const char* opts = getenv("LIBVOYEUR_OPTS");
+  uint8_t options = voyeur_decode_options(opts, VOYEUR_EVENT_EXEC);
+  const char* sockpath = getenv("LIBVOYEUR_SOCKET");
+
+  /*
+  printf("LIBVOYEUR_LIBS = %s\n", libs ? libs : "NULL");
+  printf("LIBVOYEUR_OPTS = %s\n", opts ? opts : "NULL");
+  printf("LIBVOYEUR_SOCKET = %s\n", sockpath ? sockpath : "NULL");
+  */
+
+  // Write the event to the socket.
+  int sock = voyeur_create_client_socket(sockpath);
+  voyeur_write_exec_event(sock, options, path, argv, envp);
 
   // We might as well close the socket since there's no chance we'll
   // ever be called a second time by the same process. (Even if the
@@ -134,32 +147,9 @@ int VOYEUR_FUNC(posix_spawn)(pid_t* pid,
   }
 
   // Write the event to the socket.
-  voyeur_write_event_type(voyeur_posix_spawn_sock, VOYEUR_EVENT_EXEC);
-  voyeur_write_string(voyeur_posix_spawn_sock, path, 0);
-
-  int argc = 0;
-  while (argv[argc]) {
-    ++argc;
-  }
-  voyeur_write_int(voyeur_posix_spawn_sock, argc);
-  for (int i = 0 ; i < argc ; ++i) {
-    voyeur_write_string(voyeur_posix_spawn_sock, argv[i], 0);
-  }
-
-  if (voyeur_posix_spawn_options & OBSERVE_EXEC_ENV) {
-    int envc = 0;
-    while (envp[envc]) {
-      ++envc;
-    }
-    voyeur_write_int(voyeur_posix_spawn_sock, envc);
-    for (int i = 0 ; i < envc ; ++i) {
-      voyeur_write_string(voyeur_posix_spawn_sock, envp[i], 0);
-    }
-  }
-
-  if (voyeur_posix_spawn_options & OBSERVE_EXEC_CWD) {
-    voyeur_write_string(voyeur_posix_spawn_sock, getcwd(NULL, 0), 0);
-  }
+  voyeur_write_exec_event(voyeur_posix_spawn_sock,
+                          voyeur_posix_spawn_options,
+                          path, argv, envp);
 
   pthread_mutex_unlock(&voyeur_posix_spawn_mutex);
 
