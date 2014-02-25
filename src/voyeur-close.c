@@ -21,9 +21,6 @@ static char voyeur_close_initialized = 0;
 static uint8_t voyeur_close_opts = 0;
 static int voyeur_close_sock = 0;
 
-int VOYEUR_FUNC(close)(int fildes);
-VOYEUR_INTERPOSE(close)
-
 int VOYEUR_FUNC(close)(int fildes)
 {
   pthread_mutex_lock(&voyeur_close_mutex);
@@ -50,3 +47,5 @@ int VOYEUR_FUNC(close)(int fildes)
 
   return retval;
 }
+
+VOYEUR_INTERPOSE(close)

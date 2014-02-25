@@ -21,9 +21,6 @@ static char voyeur_open_initialized = 0;
 static uint8_t voyeur_open_opts = 0;
 static int voyeur_open_sock = 0;
 
-int VOYEUR_FUNC(open)(const char* path, int oflag, ...);
-VOYEUR_INTERPOSE(open)
-
 int VOYEUR_FUNC(open)(const char* path, int oflag, ...)
 {
   pthread_mutex_lock(&voyeur_open_mutex);
@@ -82,3 +79,5 @@ int VOYEUR_FUNC(open)(const char* path, int oflag, ...)
 
   return retval;
 }
+
+VOYEUR_INTERPOSE(open)

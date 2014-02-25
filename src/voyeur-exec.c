@@ -61,9 +61,6 @@ static void write_exec_event(int sock, uint8_t options, const char* path,
 
 typedef int (*execve_fptr_t)(const char*, char* const[], char* const []);
 
-int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[]);
-VOYEUR_INTERPOSE(execve)
-
 int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[])
 {
   // In the case of exec we don't bother caching anything, since exec
@@ -101,6 +98,8 @@ int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[]
   return VOYEUR_CALL_NEXT(execve, path, argv, voyeur_envp);
 }
 
+VOYEUR_INTERPOSE(execve)
+
 
 //////////////////////////////////////////////////
 // posix_spawn
@@ -120,14 +119,6 @@ typedef int (*posix_spawn_fptr_t)(pid_t* restrict,
                                   const posix_spawnattr_t* restrict,
                                   char* const[restrict],
                                   char* const[restrict]);
-
-int VOYEUR_FUNC(posix_spawn)(pid_t* pid,
-                             const char* restrict path,
-                             const posix_spawn_file_actions_t* file_actions,
-                             const posix_spawnattr_t* restrict attrp,
-                             char* const argv[restrict],
-                             char* const envp[restrict]);
-VOYEUR_INTERPOSE(posix_spawn)
 
 int VOYEUR_FUNC(posix_spawn)(pid_t* pid,
                              const char* restrict path,
@@ -187,3 +178,5 @@ int VOYEUR_FUNC(posix_spawn)(pid_t* pid,
 
   return retval;
 }
+
+VOYEUR_INTERPOSE(posix_spawn)
