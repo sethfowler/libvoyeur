@@ -1,4 +1,4 @@
-LIBNAMES=libvoyeur libvoyeur-exec libvoyeur-open libvoyeur-close
+LIBNAMES=libvoyeur libvoyeur-recurse libvoyeur-exec libvoyeur-exit libvoyeur-open libvoyeur-close
 TESTNAMES=test-exec test-exec-recursive test-open test-exec-and-open test-open-and-close test-exec-variants
 TESTHARNESSNAME=voyeur-test
 LIBNULLNAME=libnull

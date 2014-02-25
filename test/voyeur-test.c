@@ -44,6 +44,17 @@ void exec_callback(const char* path,
   *result += 1;
 }
 
+void exit_callback(int status,
+                   pid_t pid,
+                   pid_t ppid,
+                   void* userdata)
+{
+  printf("[EXIT] %d (pid %u) (ppid %u)\n", status, pid, ppid);
+
+  char* result = (char*) userdata;
+  *result += 1;
+}
+
 void open_callback(const char* path,
                    int oflag,
                    mode_t mode,
@@ -64,7 +75,7 @@ void close_callback(int fd, int retval, pid_t pid, void* userdata)
   printf("[CLOSE] %d (rv %d) (pid %u)\n", fd, retval, pid);
 
   char* result = (char*) userdata;
-  *result = 1;
+  *result += 1;
 }
 
 void test_exec()
@@ -175,6 +186,24 @@ void test_exec_variants()
   voyeur_context_destroy(ctx);
 }
 
+void test_exit()
+{
+  unsigned result = 0;
+  voyeur_context_t ctx = voyeur_context_create();
+  voyeur_observe_exit(ctx, OBSERVE_EXIT_DEFAULT, exit_callback, (void*) &result);
+
+  char* path   = "./test-exec-recursive";
+  char* argv[] = { path, NULL };
+  char* envp[] = { NULL };
+
+  print_test_header("exit");
+  voyeur_exec(ctx, path, argv, envp);
+  // You'd expect 9, but /bin/echo doesn't call _exit...
+  print_test_footer(result == 5);
+
+  voyeur_context_destroy(ctx);
+}
+
 int main(int argc, char** argv)
 {
   test_exec();
@@ -183,5 +212,6 @@ int main(int argc, char** argv)
   test_exec_and_open();
   test_open_and_close();
   test_exec_variants();
+  test_exit();
   return 0;
 }

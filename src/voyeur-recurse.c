@@ -5,7 +5,6 @@
 #include <pthread.h>
 #include <spawn.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <unistd.h>
 
 #include "dyld.h"
@@ -13,52 +12,10 @@
 #include "net.h"
 
 
-//////////////////////////////////////////////////
-// Shared code for all exec*() functions.
-//////////////////////////////////////////////////
-
-static void write_exec_event(int sock, uint8_t options, const char* path,
-                             char* const argv[], char* const envp[],
-                             pid_t pid, pid_t ppid)
-{
-  if (!(options & OBSERVE_EXEC_NOACCESS)) {
-    // Make sure this exec() call could succeed before reporting the event.
-    if (access(path, X_OK) < 0) {
-      return;
-    }
-  }
-
-  voyeur_write_event_type(sock, VOYEUR_EVENT_EXEC);
-  voyeur_write_string(sock, path, 0);
-
-  int argc = 0;
-  while (argv[argc]) {
-    ++argc;
-  }
-  voyeur_write_int(sock, argc);
-  for (int i = 0 ; i < argc ; ++i) {
-    voyeur_write_string(sock, argv[i], 0);
-  }
-
-  if (options & OBSERVE_EXEC_ENV) {
-    int envc = 0;
-    while (envp[envc]) {
-      ++envc;
-    }
-    voyeur_write_int(sock, envc);
-    for (int i = 0 ; i < envc ; ++i) {
-      voyeur_write_string(sock, envp[i], 0);
-    }
-  }
-
-  if (options & OBSERVE_EXEC_CWD) {
-    voyeur_write_string(sock, getcwd(NULL, 0), 0);
-  }
-
-  voyeur_write_pid(sock, pid);
-  voyeur_write_pid(sock, ppid);
-}
-
+// This observer interposes on exec*(), just like libvoyeur-exec, but does not
+// generate any events. It exists to allow libvoyeur to work recursively even in
+// cases where the user does not want to observe exec*() events. event.c ensures
+// that only libvoyeur-exec or libvoyeur-recurse are linked in, but not both.
 
 //////////////////////////////////////////////////
 // execve
@@ -72,23 +29,7 @@ int VOYEUR_FUNC(execve)(const char* path, char* const argv[], char* const envp[]
   // will wipe out this whole process image anyway.
   const char* libs = getenv("LIBVOYEUR_LIBS");
   const char* opts = getenv("LIBVOYEUR_OPTS");
-  uint8_t options = voyeur_decode_options(opts, VOYEUR_EVENT_EXEC);
   const char* sockpath = getenv("LIBVOYEUR_SOCKET");
-
-  /*
-  printf("LIBVOYEUR_LIBS = %s\n", libs ? libs : "NULL");
-  printf("LIBVOYEUR_OPTS = %s\n", opts ? opts : "NULL");
-  printf("LIBVOYEUR_SOCKET = %s\n", sockpath ? sockpath : "NULL");
-  */
-
-  // Write the event to the socket.
-  int sock = voyeur_create_client_socket(sockpath);
-  write_exec_event(sock, options, path, argv, envp, getpid(), getppid());
-
-  // We might as well close the socket since there's no chance we'll
-  // ever be called a second time by the same process. (Even if the
-  // exec fails, generally the fork'd process will just bail.)
-  close(sock);
 
   // Add libvoyeur-specific environment variables. (We don't bother
   // freeing 'buf' since we need it until the execve call and we have
@@ -114,7 +55,6 @@ static pthread_mutex_t voyeur_posix_spawn_mutex = PTHREAD_MUTEX_INITIALIZER;
 static char voyeur_posix_spawn_initialized = 0;
 static char* voyeur_posix_spawn_libs = NULL;
 static char* voyeur_posix_spawn_opts = NULL;
-static uint8_t voyeur_posix_spawn_options = 0;
 static char* voyeur_posix_spawn_sockpath = NULL;
 static int voyeur_posix_spawn_sock = 0;
 
@@ -137,8 +77,6 @@ int VOYEUR_FUNC(posix_spawn)(pid_t* pid,
   if (!voyeur_posix_spawn_initialized) {
     voyeur_posix_spawn_libs = getenv("LIBVOYEUR_LIBS");
     voyeur_posix_spawn_opts = getenv("LIBVOYEUR_OPTS");
-    voyeur_posix_spawn_options =
-      voyeur_decode_options(voyeur_posix_spawn_opts, VOYEUR_EVENT_EXEC);
     voyeur_posix_spawn_sockpath = getenv("LIBVOYEUR_SOCKET");
     voyeur_posix_spawn_sock =
       voyeur_create_client_socket(voyeur_posix_spawn_sockpath);
@@ -158,28 +96,15 @@ int VOYEUR_FUNC(posix_spawn)(pid_t* pid,
   // Pass through the call to the real posix_spawn.
   VOYEUR_DECLARE_NEXT(posix_spawn_fptr_t, posix_spawn);
   VOYEUR_LOOKUP_NEXT(posix_spawn_fptr_t, posix_spawn);
-  pid_t child_pid;
-  int retval = VOYEUR_CALL_NEXT(posix_spawn, &child_pid, path,
+  int retval = VOYEUR_CALL_NEXT(posix_spawn, pid, path,
                                 file_actions, attrp,
                                 argv, voyeur_envp);
-
-  // Write the event to the socket.
-  write_exec_event(voyeur_posix_spawn_sock,
-                   voyeur_posix_spawn_options,
-                   path, argv, envp,
-                   child_pid, getpid());
 
   pthread_mutex_unlock(&voyeur_posix_spawn_mutex);
 
   // Free the resources we allocated.
   free(voyeur_envp);
   free(buf);
-
-  // It's legal to pass NULL for the pid argument, so double-check we
-  // have somewhere to write the pid to before doing it.
-  if (pid) {
-    *pid = child_pid;
-  }
 
   return retval;
 }

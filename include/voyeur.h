@@ -80,6 +80,19 @@ void voyeur_observe_exec(voyeur_context_t ctx,
                          voyeur_exec_callback callback,
                          void* userdata);
 
+// Observing when processes exit.
+typedef void (*voyeur_exit_callback)(int status,
+                                     pid_t pid,
+                                     pid_t ppid,
+                                     void* userdata);
+typedef enum {
+  OBSERVE_EXIT_DEFAULT  = 0,
+} voyeur_exit_options;
+void voyeur_observe_exit(voyeur_context_t ctx,
+                         uint8_t opts,
+                         voyeur_exit_callback callback,
+                         void* userdata);
+
 // Observing open() calls.
 typedef void (*voyeur_open_callback)(const char* path,
                                      int oflag,

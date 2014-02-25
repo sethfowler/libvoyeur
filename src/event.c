@@ -86,6 +86,21 @@ static void handle_exec(voyeur_context* context, int fd)
   }
 }
 
+static void handle_exit(voyeur_context* context, int fd)
+{
+  int status;
+  pid_t pid, ppid;
+
+  TRY(voyeur_read_int, fd, &status);
+  TRY(voyeur_read_pid, fd, &pid);
+  TRY(voyeur_read_pid, fd, &ppid);
+
+  if (context->exit_cb) {
+    ((voyeur_exit_callback)context->exit_cb)(status, pid, ppid,
+                                             context->exit_userdata);
+  }
+}
+
 static void handle_open(voyeur_context* context, int fd)
 {
   char* path;
@@ -160,6 +175,7 @@ static size_t compute_libs_size(size_t libdir_size)
 {
   static char all_libs[] =
     MAP_EVENTS
+    "libvoyeur-recurse" LIB_SUFFIX
     ;
 
   return sizeof(all_libs) + VOYEUR_EVENT_MAX * libdir_size;
@@ -177,6 +193,8 @@ static size_t compute_libs_size(size_t libdir_size)
 
 char* voyeur_requested_libs(voyeur_context* context)
 {
+  // We want absolute paths to the libraries, relative to the location of
+  // libvoyeur. We use dladdr() to determine that location.
   bool did_allocate = false;
   char* libdir = "./";
   Dl_info dlinfo;
@@ -198,6 +216,15 @@ char* voyeur_requested_libs(voyeur_context* context)
   char prev = 0;
   
   MAP_EVENTS
+
+  // If the user isn't observing exec events, we still want to apply libvoyeur
+  // recursively, so we link in libvoyeur-recurse in that case.
+  if (!context->exec_cb) {
+    if (prev) strlcat(libs, ":", libs_size);
+    strlcat(libs, libdir, libs_size);
+    strlcat(libs, "libvoyeur-recurse" LIB_SUFFIX, libs_size);
+    prev = 1;
+  }
 
   if (did_allocate) {
     free(libdir);

@@ -3,14 +3,16 @@
 
 // How to define a new event:
 // 1. Add the new event name to MAP_EVENTS.
-// 2. Define the public API in voyeur.h.
+// 2. Define the public API in voyeur.h. (To keep things readable, avoid using
+//    MAP_EVENTS there.)
 // 3. Implement voyeur-xxx.c based on one of the existing events, and
 //    add it to LIBNAMES in the Makefile.
-// 4. Implement a handle_xxx function in events.c.
+// 4. Implement a handle_xxx function in event.c.
 // 5. Add a test!
 
 #define MAP_EVENTS                              \
   ON_EVENT(EXEC, exec)                          \
+  ON_EVENT(EXIT, exit)                          \
   ON_EVENT(OPEN, open)                          \
   ON_EVENT(CLOSE, close)                        \
 
