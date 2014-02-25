@@ -111,7 +111,13 @@ int run_server(voyeur_context* context,
   while (!child_exited) {
     // Block until input arrives.
     read_fd_set = active_fd_set;
-    TRY(select, FD_SETSIZE, &read_fd_set, NULL, NULL, NULL);
+    if (select(FD_SETSIZE, &read_fd_set, NULL, NULL, NULL) < 0) {
+      if (errno == EAGAIN || errno == EINTR) {
+        continue;  // This is a temporary error.
+      } else {
+        break;     // This is unrecoverable.
+      }
+    }
 
     for (int fd = 0 ; fd < FD_SETSIZE ; ++fd) {
       if (FD_ISSET(fd, &read_fd_set)) {
