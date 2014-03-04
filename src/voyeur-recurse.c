@@ -51,19 +51,30 @@ VOYEUR_INTERPOSE(execve)
 // posix_spawn
 //////////////////////////////////////////////////
 
-static pthread_mutex_t voyeur_posix_spawn_mutex = PTHREAD_MUTEX_INITIALIZER;
-static char voyeur_posix_spawn_initialized = 0;
-static char* voyeur_posix_spawn_libs = NULL;
-static char* voyeur_posix_spawn_opts = NULL;
-static char* voyeur_posix_spawn_sockpath = NULL;
-static int voyeur_posix_spawn_sock = 0;
-
 typedef int (*posix_spawn_fptr_t)(pid_t* restrict,
                                   const char* restrict,
                                   const posix_spawn_file_actions_t*,
                                   const posix_spawnattr_t* restrict,
                                   char* const[restrict],
                                   char* const[restrict]);
+
+static pthread_mutex_t voyeur_posix_spawn_mutex = PTHREAD_MUTEX_INITIALIZER;
+static char voyeur_posix_spawn_initialized = 0;
+static char* voyeur_posix_spawn_libs = NULL;
+static char* voyeur_posix_spawn_opts = NULL;
+static char* voyeur_posix_spawn_sockpath = NULL;
+VOYEUR_STATIC_DECLARE_NEXT(posix_spawn_fptr_t, posix_spawn);
+
+__attribute__((destructor)) void voyeur_cleanup_posix_spawn()
+{
+  pthread_mutex_lock(&voyeur_posix_spawn_mutex);
+
+  if (voyeur_posix_spawn_initialized) {
+    voyeur_posix_spawn_initialized = 0;
+  }
+
+  pthread_mutex_unlock(&voyeur_posix_spawn_mutex);
+}
 
 int VOYEUR_FUNC(posix_spawn)(pid_t* pid,
                              const char* restrict path,
@@ -78,8 +89,6 @@ int VOYEUR_FUNC(posix_spawn)(pid_t* pid,
     voyeur_posix_spawn_libs = getenv("LIBVOYEUR_LIBS");
     voyeur_posix_spawn_opts = getenv("LIBVOYEUR_OPTS");
     voyeur_posix_spawn_sockpath = getenv("LIBVOYEUR_SOCKET");
-    voyeur_posix_spawn_sock =
-      voyeur_create_client_socket(voyeur_posix_spawn_sockpath);
     VOYEUR_LOOKUP_NEXT(posix_spawn_fptr_t, posix_spawn);
     voyeur_posix_spawn_initialized = 1;
   }
@@ -94,8 +103,6 @@ int VOYEUR_FUNC(posix_spawn)(pid_t* pid,
                                &buf);
 
   // Pass through the call to the real posix_spawn.
-  VOYEUR_DECLARE_NEXT(posix_spawn_fptr_t, posix_spawn);
-  VOYEUR_LOOKUP_NEXT(posix_spawn_fptr_t, posix_spawn);
   int retval = VOYEUR_CALL_NEXT(posix_spawn, pid, path,
                                 file_actions, attrp,
                                 argv, voyeur_envp);

@@ -21,6 +21,23 @@ static char voyeur_open_initialized = 0;
 static uint8_t voyeur_open_opts = 0;
 static int voyeur_open_sock = 0;
 
+__attribute__((destructor)) void voyeur_cleanup_open()
+{
+  pthread_mutex_lock(&voyeur_open_mutex);
+
+  if (voyeur_open_initialized) {
+    if (voyeur_open_sock >= 0) {
+      voyeur_write_msg_type(voyeur_open_sock, VOYEUR_MSG_DONE);
+      voyeur_close_socket(voyeur_open_sock);
+      voyeur_open_sock = -1;
+    }
+
+    voyeur_open_initialized = 0;
+  }
+
+  pthread_mutex_unlock(&voyeur_open_mutex);
+}
+
 int VOYEUR_FUNC(open)(const char* path, int oflag, ...)
 {
   pthread_mutex_lock(&voyeur_open_mutex);
@@ -55,25 +72,28 @@ int VOYEUR_FUNC(open)(const char* path, int oflag, ...)
   }
 
   // Write the event to the socket.
-  voyeur_write_event_type(voyeur_open_sock, VOYEUR_EVENT_OPEN);
-  voyeur_write_string(voyeur_open_sock, path, 0);
-  voyeur_write_int(voyeur_open_sock, oflag);
+  if (voyeur_open_sock >= 0) {
+    voyeur_write_msg_type(voyeur_open_sock, VOYEUR_MSG_EVENT);
+    voyeur_write_event_type(voyeur_open_sock, VOYEUR_EVENT_OPEN);
+    voyeur_write_string(voyeur_open_sock, path, 0);
+    voyeur_write_int(voyeur_open_sock, oflag);
 
-  if (oflag & O_CREAT) {
-    voyeur_write_int(voyeur_open_sock, (int) mode);
-  } else {
-    voyeur_write_int(voyeur_open_sock, 0);
+    if (oflag & O_CREAT) {
+      voyeur_write_int(voyeur_open_sock, (int) mode);
+    } else {
+      voyeur_write_int(voyeur_open_sock, 0);
+    }
+
+    voyeur_write_int(voyeur_open_sock, retval);
+
+    if (voyeur_open_opts & OBSERVE_OPEN_CWD) {
+      char* cwd = getcwd(NULL, 0);
+      voyeur_write_string(voyeur_open_sock, cwd, 0);
+      free(cwd);
+    }
+
+    voyeur_write_pid(voyeur_open_sock, getpid());
   }
-
-  voyeur_write_int(voyeur_open_sock, retval);
-
-  if (voyeur_open_opts & OBSERVE_OPEN_CWD) {
-    char* cwd = getcwd(NULL, 0);
-    voyeur_write_string(voyeur_open_sock, cwd, 0);
-    free(cwd);
-  }
-
-  voyeur_write_pid(voyeur_open_sock, getpid());
 
   pthread_mutex_unlock(&voyeur_open_mutex);
 

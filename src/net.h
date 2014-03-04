@@ -20,6 +20,24 @@ int voyeur_create_server_socket(struct sockaddr_un* sockinfo);
 // Creates a socket and connects to the provided socket path on it.
 int voyeur_create_client_socket(const char* sockpath);
 
+// Closes the provided socket (or pipe) safely.
+void voyeur_close_socket(int fd);
+
+
+//////////////////////////////////////////////////
+// Message serialization.
+//////////////////////////////////////////////////
+
+// Every libvoyeur network message starts with a message type.
+
+typedef enum {
+  VOYEUR_MSG_EVENT,
+  VOYEUR_MSG_DONE
+} voyeur_msg_type;
+
+// Reader and writer for message types.
+int voyeur_write_msg_type(int fd, voyeur_msg_type val);
+int voyeur_read_msg_type(int fd, voyeur_msg_type* val);
 
 //////////////////////////////////////////////////
 // Event serialization.
@@ -29,11 +47,14 @@ int voyeur_create_client_socket(const char* sockpath);
 // sequence of bytes, integers, and strings particular to the event.
 //
 // A typical sequence of calls for a writer:
+//   voyeur_write_msg_type(fd, VOYEUR_MSG_EVENT);
 //   voyeur_write_event_type(fd, VOYEUR_EVENT_XXX);
 //   voyeur_write_string(fd, file, strlen(file));
 //   voyeur_write_int(fd, flags);
 //
 // A matching sequence of calls for a reader:
+//   voyeur_read_msg_type(fd, &msgtype);
+//   /* dispatch to handler for VOYEUR_MSG_EVENT */
 //   voyeur_read_event_type(fd, &type);
 //   /* dispatch to handler for VOYEUR_EVENT_XXX */
 //   voyeur_read_string(fd, &file, &len);

@@ -1,8 +1,10 @@
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
 
@@ -24,10 +26,17 @@ int voyeur_create_server_socket(struct sockaddr_un* sockinfo)
   // Start the server.
   int server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
   TRY(bind, server_sock, (struct sockaddr*) sockinfo, sizeof(struct sockaddr_un));
-  TRY(listen, server_sock, 5);
+  TRY(listen, server_sock, 200);
+  //chmod(sockinfo->sun_path, 0777);
+  //fchmod(server_sock, 0777);
 
+  fcntl(server_sock, F_SETFD, FD_CLOEXEC);
   return server_sock;
 }
+
+#define CONNECT_RETRIES 20
+#define CONNECT_WAIT_MS 50
+#define CONNECT_DEVIATION_MS 20
 
 int voyeur_create_client_socket(const char* sockpath)
 {
@@ -35,15 +44,38 @@ int voyeur_create_client_socket(const char* sockpath)
 
   memset(&sockinfo, 0, sizeof(struct sockaddr_un));
   sockinfo.sun_family = AF_UNIX;
-  strncpy(sockinfo.sun_path,
-          sockpath,
-          sizeof(sockinfo.sun_path) - 1);
+  strlcpy(sockinfo.sun_path, sockpath, sizeof(sockinfo.sun_path));
 
   // Connect to the server.
   int client_sock = socket(AF_UNIX, SOCK_STREAM, 0);
-  TRY(connect, client_sock, (struct sockaddr*) &sockinfo, sizeof(struct sockaddr_un));
+  int set = 1;
+  setsockopt(client_sock, SOL_SOCKET, SO_NOSIGPIPE, (void *)&set, sizeof(int));
+
+  unsigned try = 0;
+  int connect_status = connect(client_sock,
+                               (struct sockaddr*) &sockinfo,
+                               sizeof(struct sockaddr_un));
   
+  while (connect_status < 0 && ++try < CONNECT_RETRIES) {
+    usleep(((CONNECT_WAIT_MS - CONNECT_DEVIATION_MS / 2) +
+            arc4random_uniform(CONNECT_DEVIATION_MS)) * 1000);
+    connect_status = connect(client_sock,
+                             (struct sockaddr*) &sockinfo,
+                             sizeof(struct sockaddr_un));
+  }
+
+  fcntl(client_sock, F_SETFD, FD_CLOEXEC);
   return client_sock;
+}
+
+void voyeur_close_socket(int fd)
+{
+  while (close(fd) < 0) {
+    if (errno != EINTR) {
+      // We really only want to keep spinning for EINTR.
+      break;
+    }
+  }
 }
 
 static int do_write(int fd, void* buf, size_t buf_size)
@@ -97,6 +129,16 @@ static int do_read(int fd, void* buf, size_t buf_size)
   return 0;
 }
   
+int voyeur_write_msg_type(int fd, voyeur_msg_type val)
+{
+  return do_write(fd, (void*) &val, sizeof(voyeur_msg_type));
+}
+
+int voyeur_read_msg_type(int fd, voyeur_msg_type* val)
+{
+  return do_read(fd, (void*) val, sizeof(voyeur_msg_type));
+}
+
 int voyeur_write_event_type(int fd, voyeur_event_type val)
 {
   return do_write(fd, (void*) &val, sizeof(voyeur_event_type));

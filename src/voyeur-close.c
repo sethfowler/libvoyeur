@@ -21,6 +21,23 @@ static char voyeur_close_initialized = 0;
 static uint8_t voyeur_close_opts = 0;
 static int voyeur_close_sock = 0;
 
+__attribute__((destructor)) void voyeur_cleanup_close()
+{
+  pthread_mutex_lock(&voyeur_close_mutex);
+
+  if (voyeur_close_initialized) {
+    if (voyeur_close_sock >= 0) {
+      voyeur_write_msg_type(voyeur_close_sock, VOYEUR_MSG_DONE);
+      voyeur_close_socket(voyeur_close_sock);
+      voyeur_close_sock = -1;
+    }
+    
+    voyeur_close_initialized = 0;
+  }
+
+  pthread_mutex_unlock(&voyeur_close_mutex);
+}
+
 int VOYEUR_FUNC(close)(int fildes)
 {
   pthread_mutex_lock(&voyeur_close_mutex);
@@ -38,10 +55,13 @@ int VOYEUR_FUNC(close)(int fildes)
   int retval = VOYEUR_CALL_NEXT(close, fildes);
 
   // Write the event to the socket.
-  voyeur_write_event_type(voyeur_close_sock, VOYEUR_EVENT_CLOSE);
-  voyeur_write_int(voyeur_close_sock, fildes);
-  voyeur_write_int(voyeur_close_sock, retval);
-  voyeur_write_pid(voyeur_close_sock, getpid());
+  if (voyeur_close_sock >= 0) {
+    voyeur_write_msg_type(voyeur_close_sock, VOYEUR_MSG_EVENT);
+    voyeur_write_event_type(voyeur_close_sock, VOYEUR_EVENT_CLOSE);
+    voyeur_write_int(voyeur_close_sock, fildes);
+    voyeur_write_int(voyeur_close_sock, retval);
+    voyeur_write_pid(voyeur_close_sock, getpid());
+  }
 
   pthread_mutex_unlock(&voyeur_close_mutex);
 

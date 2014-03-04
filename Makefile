@@ -38,7 +38,7 @@ build:
 $(OBJECTS): build/%.o : src/%.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(LIBS): build/lib%.$(LIBSUFFIX) : build/%.o build/net.o build/env.o build/event.o
+$(LIBS): build/lib%.$(LIBSUFFIX) : build/%.o build/net.o build/env.o build/event.o build/util.o
 ifeq ($(UNAME), Darwin)
 	$(CC) $(CFLAGS) $^ -dynamiclib -install_name $(BUILDDIR)/lib$*.$(LIBSUFFIX) -o $@
 else

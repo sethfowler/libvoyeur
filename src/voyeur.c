@@ -59,8 +59,9 @@ void* waitpid_thread(void* arg_ptr)
 
   voyeur_write_int(arg->child_pipe_input, status);
 
-  close(arg->child_pipe_input);
+  voyeur_close_socket(arg->child_pipe_input);
   free(arg);
+
   return NULL;
 }
 
@@ -90,17 +91,41 @@ int accept_connection(int server_sock)
   int client_sock =
     accept(server_sock, (struct sockaddr *) &client_info, &client_info_len);
   CHECK(client_sock, "accept");
-
-  //printf("Client %d connected.\n", client_sock);
   
   return client_sock;
+}
+
+int handle_message(voyeur_context* context, int sock)
+{
+  voyeur_msg_type msgtype;
+  if (voyeur_read_msg_type(sock, &msgtype) < 0) {
+    return -1;
+  }
+
+  if (msgtype == VOYEUR_MSG_DONE) {
+    // The client is done sending messages on this socket.
+    return -1;
+  } else if (msgtype == VOYEUR_MSG_EVENT) {
+    voyeur_event_type type;
+    if (voyeur_read_event_type(sock, &type) < 0) {
+      return -1;
+    }
+
+    // Got a voyeur event; dispatch to the appropriate handler.
+    voyeur_handle_event(context, type, sock);
+    return 0;
+  } else {
+    // Got an unknown message type.
+    voyeur_log("Unknown message type\n");
+    return -1;
+  }
 }
 
 int run_server(voyeur_context* context,
                int server_sock,
                int child_pipe_output)
 {
-  fd_set active_fd_set, read_fd_set;
+  fd_set active_fd_set, read_fd_set, error_fd_set;
   FD_ZERO(&active_fd_set);
   FD_SET(server_sock, &active_fd_set);
   FD_SET(child_pipe_output, &active_fd_set);
@@ -110,41 +135,47 @@ int run_server(voyeur_context* context,
   
   while (!child_exited) {
     // Block until input arrives.
-    read_fd_set = active_fd_set;
-    if (select(FD_SETSIZE, &read_fd_set, NULL, NULL, NULL) < 0) {
+    FD_COPY(&active_fd_set, &read_fd_set);
+    FD_COPY(&active_fd_set, &error_fd_set);
+    if (select(FD_SETSIZE, &read_fd_set, NULL, &error_fd_set, NULL) < 0) {
       if (errno == EAGAIN || errno == EINTR) {
         continue;  // This is a temporary error.
       } else {
+        perror("select");
         break;     // This is unrecoverable.
       }
     }
 
     for (int fd = 0 ; fd < FD_SETSIZE ; ++fd) {
-      if (FD_ISSET(fd, &read_fd_set)) {
+      if (FD_ISSET(fd, &error_fd_set)) {
+        voyeur_log("Closed file descriptor due to error\n");
+        voyeur_close_socket(fd);
+        FD_CLR(fd, &active_fd_set);
+      } else if (FD_ISSET(fd, &read_fd_set)) {
         if (fd == server_sock) {
           int client_sock = accept_connection(server_sock);
           FD_SET(client_sock, &active_fd_set);
         } else if (fd == child_pipe_output) {
           child_exited = 1;
           voyeur_read_int(fd, &child_status);
-          close(fd);
+          voyeur_close_socket(fd);
           FD_CLR(fd, &active_fd_set);
-        } else {
-          // Got a voyeur event; dispatch to the appropriate handler.
-          voyeur_event_type type;
-          if (voyeur_read_event_type(fd, &type) < 0) {
-            //printf("Client %d disconnected.\n", fd);
-            close(fd);
-            FD_CLR(fd, &active_fd_set);
-          } else {
-            voyeur_handle_event(context, type, fd);
-          }
+        } else if (handle_message(context, fd) < 0) {
+          voyeur_close_socket(fd);
+          FD_CLR(fd, &active_fd_set);
         }
       }
     }
   }
 
-  close(server_sock);
+  voyeur_close_socket(server_sock);
+
+  // Clean up any stragglers.
+  for (int fd = 0 ; fd < FD_SETSIZE ; ++fd) {
+    if (FD_ISSET(fd, &active_fd_set)) {
+      voyeur_close_socket(fd);
+    }
+  }
   
   if (WIFEXITED(child_status)) {
     return WEXITSTATUS(child_status);
