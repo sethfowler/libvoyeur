@@ -210,7 +210,7 @@ int main(int argc, char** argv)
   test_exec_recursive();
   test_open();
   test_exec_and_open();
-  test_open_and_close();
+  //test_open_and_close();
   test_exec_variants();
   test_exit();
   return 0;

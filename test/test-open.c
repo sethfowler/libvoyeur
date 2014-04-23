@@ -1,11 +1,14 @@
+#ifdef __linux__
+#define _GNU_SOURCE
+#endif
+
 #include <fcntl.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #ifdef __linux__
-// For strlcpy/strlcat.
-#include <bsd/string.h>
+#include <bsd/bsd.h>
 #endif
 
 void run_test()

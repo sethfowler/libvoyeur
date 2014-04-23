@@ -1,3 +1,7 @@
+#ifdef __linux__
+#define _GNU_SOURCE
+#endif
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -7,6 +11,10 @@
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
+
+#ifdef __linux__
+#include <bsd/bsd.h>
+#endif
 
 #include "net.h"
 #include "util.h"
@@ -28,6 +36,7 @@ int voyeur_create_server_socket(struct sockaddr_un* sockinfo)
   RETURN_ERROR_ON_FAIL(bind, server_sock, (struct sockaddr*) sockinfo,
                                           sizeof(struct sockaddr_un));
   RETURN_ERROR_ON_FAIL(listen, server_sock, 200);
+
   //chmod(sockinfo->sun_path, 0777);
   //fchmod(server_sock, 0777);
 
@@ -50,7 +59,10 @@ int voyeur_create_client_socket(const char* sockpath)
   // Connect to the server.
   int client_sock = socket(AF_UNIX, SOCK_STREAM, 0);
   int set = 1;
+
+#ifdef __APPLE__
   setsockopt(client_sock, SOL_SOCKET, SO_NOSIGPIPE, (void *)&set, sizeof(int));
+#endif
 
   unsigned try = 0;
   int connect_status = connect(client_sock,
@@ -79,13 +91,20 @@ void voyeur_close_socket(int fd)
   }
 }
 
+#ifdef __linux__
+#define SEND_OPTS MSG_NOSIGNAL
+#else
+#define SEND_OPTS 0
+#endif
+
 static int do_write(int fd, void* buf, size_t buf_size)
 {
   ssize_t total_out = 0;
   while (total_out < (ssize_t) buf_size) {
-    ssize_t out = write(fd,
-                        buf + total_out,
-                        buf_size - total_out);
+    ssize_t out = send(fd,
+                       buf + total_out,
+                       buf_size - total_out,
+                       SEND_OPTS);
 
     // Handle errors.
     if (out < 0) {

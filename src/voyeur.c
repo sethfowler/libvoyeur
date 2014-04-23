@@ -1,3 +1,7 @@
+#ifdef __linux__
+#define _GNU_SOURCE
+#endif
+
 #include <errno.h>
 #include <pthread.h>
 #include <spawn.h>
@@ -10,8 +14,7 @@
 #include <unistd.h>
 
 #ifdef __linux__
-// For strlcpy/strlcat.
-#include <bsd/string.h>
+#include <bsd/bsd.h>
 #endif
 
 #include <voyeur.h>
@@ -62,7 +65,7 @@ typedef struct {
   int child_pipe_input;
 } waitpid_thread_arg;
 
-void* waitpid_thread(void* arg_ptr)
+static void* waitpid_thread(void* arg_ptr)
 {
   waitpid_thread_arg* arg = (waitpid_thread_arg*) arg_ptr;
   
@@ -77,7 +80,7 @@ void* waitpid_thread(void* arg_ptr)
   return NULL;
 }
 
-int start_waitpid_thread(pid_t child_pid)
+static int start_waitpid_thread(pid_t child_pid)
 {
   // Create a pipe that will be used to announce the termination of
   // the child process.
@@ -95,7 +98,7 @@ int start_waitpid_thread(pid_t child_pid)
   return waitpid_pipe[0];
 }
 
-int accept_connection(int server_sock)
+static int accept_connection(int server_sock)
 {
   struct sockaddr_un client_info;
   socklen_t client_info_len = sizeof(struct sockaddr_un);
@@ -107,7 +110,7 @@ int accept_connection(int server_sock)
   return client_sock;
 }
 
-int handle_message(voyeur_context* context, int sock)
+static int handle_message(voyeur_context* context, int sock)
 {
   voyeur_msg_type msgtype;
   if (voyeur_read_msg_type(sock, &msgtype) < 0) {
@@ -133,9 +136,9 @@ int handle_message(voyeur_context* context, int sock)
   }
 }
 
-int run_server(voyeur_context* context,
-               int server_sock,
-               int child_pipe_output)
+static int run_server(voyeur_context* context,
+                      int server_sock,
+                      int child_pipe_output)
 {
   fd_set active_fd_set, read_fd_set, error_fd_set;
   FD_ZERO(&active_fd_set);
@@ -147,8 +150,8 @@ int run_server(voyeur_context* context,
   
   while (!child_exited) {
     // Block until input arrives.
-    FD_COPY(&active_fd_set, &read_fd_set);
-    FD_COPY(&active_fd_set, &error_fd_set);
+    read_fd_set = active_fd_set;
+    error_fd_set = active_fd_set;
     if (select(FD_SETSIZE, &read_fd_set, NULL, &error_fd_set, NULL) < 0) {
       if (errno == EAGAIN || errno == EINTR) {
         continue;  // This is a temporary error.

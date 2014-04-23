@@ -1,3 +1,7 @@
+#ifdef __linux__
+#define _GNU_SOURCE
+#endif
+
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>

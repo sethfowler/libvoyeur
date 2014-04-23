@@ -1,6 +1,8 @@
 #ifndef VOYEUR_EVENTS_H
 #define VOYEUR_EVENTS_H
 
+#include <stdint.h>
+
 // How to define a new event:
 // 1. Add the new event name to MAP_EVENTS.
 // 2. Define the public API in voyeur.h. (To keep things readable, avoid using

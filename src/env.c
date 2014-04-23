@@ -1,10 +1,13 @@
+#ifdef __linux__
+#define _GNU_SOURCE
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
 #ifdef __linux__
-// For strlcpy/strlcat.
-#include <bsd/string.h>
+#include <bsd/bsd.h>
 #endif
 
 #include "env.h"

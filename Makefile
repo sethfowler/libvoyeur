@@ -4,6 +4,7 @@
 
 CC?=clang
 CFLAGS?=
+LDFLAGS?=
 PREFIX?=/usr/local/bin
 
 CFLAGS+=-I./include -std=c99
@@ -34,7 +35,8 @@ ifeq ($(UNAME), Darwin)
   LIBSUFFIX=dylib
 else
   LIBSUFFIX=so
-  CFLAGS+=-fPIC -pthread -lbsd
+  CFLAGS+=-fPIC -pthread
+  LDFLAGS+=-lbsd -ldl
 endif
 
 HEADERS=$(wildcard src/*.h) $(wildcard include/*.h)
@@ -54,19 +56,27 @@ BUILDDIR=$(realpath build/)
 
 ifeq ($(UNAME), Darwin)
   define make-dynamic-lib
-  $(CC) $(CFLAGS) $^ -dynamiclib -install_name lib$*.$(LIBSUFFIX) -o $@
+  $(CC) $(CFLAGS) $^ -dynamiclib -install_name lib$*.$(LIBSUFFIX) -o $@ $(LDFLAGS)
   endef
 
   define make-exec
-  $(CC) $(CFLAGS) -Lbuild -lvoyeur $< -o $@
+  $(CC) $(CFLAGS) $< -o $@ -Lbuild -lvoyeur $(LDFLAGS)
+  endef
+
+  define make-test
+  $(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
   endef
 else
   define make-dynamic-lib
-  $(CC) $(CFLAGS) $^ -shared -Wl,-soname,lib$*.$(LIBSUFFIX) -o $@ -ldl
+  $(CC) $(CFLAGS) $^ -shared -Wl,-soname,lib$*.$(LIBSUFFIX) -o $@ $(LDFLAGS)
   endef
 
   define make-exec
-  $(CC) $(CFLAGS) -Lbuild -lvoyeur -Wl,-rpath '-Wl,$$ORIGIN' $< -o $@
+  $(CC) $(CFLAGS) -Wl,-rpath '-Wl,$$ORIGIN' $< -o $@ -Lbuild -lvoyeur $(LDFLAGS)
+  endef
+
+  define make-test
+  $(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
   endef
 endif
 
@@ -106,7 +116,7 @@ $(TESTHARNESS): build/% : test/%.c $(LIBS)
 	$(make-exec)
 
 $(TESTS): build/% : test/%.c $(LIBS)
-	$(CC) $(CFLAGS) $< -o $@
+	$(make-test)
 
 $(LIBNULL): build/lib%.$(LIBSUFFIX) : test/%.c
 	$(make-dynamic-lib)

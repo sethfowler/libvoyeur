@@ -81,6 +81,13 @@ void run_execvp_test()
 
 void run_execvP_test()
 {
+#ifdef __linux__
+
+  // No execvP on this platform.
+  run_execvp_test();
+
+#else
+
   static char* new_argv[] = { "/bin/echo", "execvP", NULL };
   pid_t child_pid;
   if ((child_pid = fork()) == 0) {
@@ -89,6 +96,8 @@ void run_execvP_test()
     int status;
     waitpid(child_pid, &status, 0);
   }
+
+#endif
 }
 
 void run_system_test()

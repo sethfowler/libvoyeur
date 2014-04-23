@@ -1,8 +1,17 @@
+#ifdef __linux__
+#define _GNU_SOURCE
+#endif
+
 #include <dlfcn.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#ifdef __linux__
+#include <bsd/bsd.h>
+#endif
 
 #include "env.h"
 #include "event.h"
@@ -191,7 +200,7 @@ static size_t compute_libs_size(size_t libdir_size)
     prev = 1;                                             \
   }                                                       \
 
-char* get_default_resource_path(voyeur_context* context, bool* did_allocate)
+static char* get_default_resource_path(voyeur_context* context, bool* did_allocate)
 {
   // We want absolute paths to the libraries, relative to the location of
   // libvoyeur. We use dladdr() to determine that location.
