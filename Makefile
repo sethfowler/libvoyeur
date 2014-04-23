@@ -3,8 +3,10 @@
 ###############################################################################
 
 CC?=clang
-CFLAGS?=-I./include
+CFLAGS?=
 PREFIX?=/usr/local/bin
+
+CFLAGS+=-I./include -std=c99
 
 ifdef DEBUG
 CFLAGS+=-g -DDEBUG
