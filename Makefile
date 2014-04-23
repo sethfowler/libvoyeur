@@ -7,7 +7,7 @@ CFLAGS?=-I./include
 PREFIX?=/usr/local/bin
 
 ifdef DEBUG
-CFLAGS+=-g
+CFLAGS+=-g -DDEBUG
 endif
 
 

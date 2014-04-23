@@ -161,6 +161,8 @@ void voyeur_set_resource_path(voyeur_context_t ctx,
 // This function should be called before forking. After calling
 // voyeur_prepare(), it isn't safe to call voyeur_observe_* functions
 // on the same context anymore.
+//
+// Returns NULL on failure.
 char** voyeur_prepare(voyeur_context_t ctx, char* const envp[]);
 
 // Start observing a child process.
@@ -188,6 +190,10 @@ int voyeur_start(voyeur_context_t ctx, pid_t child_pid);
 // Like voyeur_start(), it returns the exit status of the child. After
 // voyeur_exec() returns, you should use voyeur_context_destroy() to
 // release the resources libvoyeur has acquired.
+//
+// voyeur_exec() may fail, in which case it will return -1. If you need
+// to distinguish between a child process exit status of -1 and a failure
+// inside libvoyeur, use voyeur_prepare() and voyeur_start().
 int voyeur_exec(voyeur_context_t ctx,
                 const char* path,
                 char* const argv[],

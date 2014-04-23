@@ -19,16 +19,16 @@ static void handle_exec(voyeur_context* context, int fd)
 {
   // Read the path.
   char* path;
-  TRY(voyeur_read_string, fd, &path, 0);
+  RETURN_ON_FAIL(voyeur_read_string, fd, &path, 0);
 
   // Read the arguments.
   int argc;
-  TRY(voyeur_read_int, fd, &argc);
+  RETURN_ON_FAIL(voyeur_read_int, fd, &argc);
 
   char** argv = malloc(sizeof(char*) * (argc + 1));
   for (int i = 0 ; i < argc ; ++i) {
     char* arg;
-    TRY(voyeur_read_string, fd, &arg, 0);
+    RETURN_ON_FAIL(voyeur_read_string, fd, &arg, 0);
     argv[i] = arg;
   }
   argv[argc] = NULL;
@@ -37,12 +37,12 @@ static void handle_exec(voyeur_context* context, int fd)
   int envc;
   char** envp = NULL;
   if (context->exec_opts & OBSERVE_EXEC_ENV) {
-    TRY(voyeur_read_int, fd, &envc);
+    RETURN_ON_FAIL(voyeur_read_int, fd, &envc);
 
     envp = malloc(sizeof(char*) * (envc + 1));
     for (int i = 0 ; i < envc ; ++i) {
       char* envvar;
-      TRY(voyeur_read_string, fd, &envvar, 0);
+      RETURN_ON_FAIL(voyeur_read_string, fd, &envvar, 0);
       envp[i] = envvar;
     }
     envp[envc] = NULL;
@@ -51,13 +51,13 @@ static void handle_exec(voyeur_context* context, int fd)
   // Read the current working directory.
   char* cwd = NULL;
   if (context->exec_opts & OBSERVE_EXEC_CWD) {
-    TRY(voyeur_read_string, fd, &cwd, 0);
+    RETURN_ON_FAIL(voyeur_read_string, fd, &cwd, 0);
   }
 
   // Read the pid and ppid.
   pid_t pid, ppid;
-  TRY(voyeur_read_pid, fd, &pid);
-  TRY(voyeur_read_pid, fd, &ppid);
+  RETURN_ON_FAIL(voyeur_read_pid, fd, &pid);
+  RETURN_ON_FAIL(voyeur_read_pid, fd, &ppid);
 
   if (context->exec_cb) {
     ((voyeur_exec_callback)context->exec_cb)(path, argv,
@@ -91,9 +91,9 @@ static void handle_exit(voyeur_context* context, int fd)
   int status;
   pid_t pid, ppid;
 
-  TRY(voyeur_read_int, fd, &status);
-  TRY(voyeur_read_pid, fd, &pid);
-  TRY(voyeur_read_pid, fd, &ppid);
+  RETURN_ON_FAIL(voyeur_read_int, fd, &status);
+  RETURN_ON_FAIL(voyeur_read_pid, fd, &pid);
+  RETURN_ON_FAIL(voyeur_read_pid, fd, &ppid);
 
   if (context->exit_cb) {
     ((voyeur_exit_callback)context->exit_cb)(status, pid, ppid,
@@ -108,16 +108,16 @@ static void handle_open(voyeur_context* context, int fd)
   char* cwd = NULL;
   pid_t pid;
 
-  TRY(voyeur_read_string, fd, &path, 0);
-  TRY(voyeur_read_int, fd, &oflag);
-  TRY(voyeur_read_int, fd, &mode);
-  TRY(voyeur_read_int, fd, &retval);
+  RETURN_ON_FAIL(voyeur_read_string, fd, &path, 0);
+  RETURN_ON_FAIL(voyeur_read_int, fd, &oflag);
+  RETURN_ON_FAIL(voyeur_read_int, fd, &mode);
+  RETURN_ON_FAIL(voyeur_read_int, fd, &retval);
 
   if (context->open_opts & OBSERVE_OPEN_CWD) {
-    TRY(voyeur_read_string, fd, &cwd, 0);
+    RETURN_ON_FAIL(voyeur_read_string, fd, &cwd, 0);
   }
 
-  TRY(voyeur_read_pid, fd, &pid);
+  RETURN_ON_FAIL(voyeur_read_pid, fd, &pid);
 
   if (context->open_cb) {
     ((voyeur_open_callback)context->open_cb)(path, oflag,
@@ -134,9 +134,9 @@ static void handle_close(voyeur_context* context, int fd)
   int fildes, retval;
   pid_t pid;
 
-  TRY(voyeur_read_int, fd, &fildes);
-  TRY(voyeur_read_int, fd, &retval);
-  TRY(voyeur_read_pid, fd, &pid);
+  RETURN_ON_FAIL(voyeur_read_int, fd, &fildes);
+  RETURN_ON_FAIL(voyeur_read_int, fd, &retval);
+  RETURN_ON_FAIL(voyeur_read_pid, fd, &pid);
 
   if (context->close_cb) {
     ((voyeur_close_callback)context->close_cb)(fildes, retval, pid,
@@ -154,9 +154,9 @@ void voyeur_handle_event(voyeur_context* context, voyeur_event_type type, int fd
   switch (type) {
     MAP_EVENTS
     default:
-      fprintf(stderr, "libvoyeur: got unknown event type %u\n",
-              (unsigned) type);
-      exit(EXIT_FAILURE);
+      SHOULD_NOT_REACH("libvoyeur: got unknown event type %u\n",
+                       (unsigned) type);
+      return;
   }
 }
 

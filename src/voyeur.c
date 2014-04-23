@@ -82,7 +82,7 @@ int start_waitpid_thread(pid_t child_pid)
   // Create a pipe that will be used to announce the termination of
   // the child process.
   int waitpid_pipe[2];
-  TRY(pipe, waitpid_pipe);
+  ABORT_ON_FAIL(pipe, waitpid_pipe);
 
   waitpid_thread_arg* arg = malloc(sizeof(waitpid_thread_arg));
   arg->child_pid = child_pid;
@@ -102,7 +102,7 @@ int accept_connection(int server_sock)
 
   int client_sock =
     accept(server_sock, (struct sockaddr *) &client_info, &client_info_len);
-  CHECK(client_sock, "accept");
+  WARN_ON_FAIL_VALUE(client_sock, "accept");
   
   return client_sock;
 }
@@ -166,7 +166,9 @@ int run_server(voyeur_context* context,
       } else if (FD_ISSET(fd, &read_fd_set)) {
         if (fd == server_sock) {
           int client_sock = accept_connection(server_sock);
-          FD_SET(client_sock, &active_fd_set);
+          if (client_sock >= 0) {
+            FD_SET(client_sock, &active_fd_set);
+          }
         } else if (fd == child_pipe_output) {
           child_exited = 1;
           voyeur_read_int(fd, &child_status);
@@ -207,6 +209,9 @@ char** voyeur_prepare(voyeur_context_t ctx, char* const envp[])
   // racing and so that we can include the socket path in the
   // environment variables.
   state->server_sock = voyeur_create_server_socket(&state->sockinfo);
+  if (state->server_sock < 0) {
+    return NULL;
+  }
   
   // Add libvoyeur-specific environment variables.
   char* libs = voyeur_requested_libs(context);
@@ -230,12 +235,12 @@ int voyeur_start(voyeur_context_t ctx, pid_t child_pid)
                        child_pipe_output);
 
   // Clean up the socket file.
-  TRY(unlink, state->sockinfo.sun_path);
+  WARN_ON_FAIL(unlink, state->sockinfo.sun_path);
   char* last_slash = strrchr(state->sockinfo.sun_path, '/');
   if (last_slash) {
     *last_slash = '\0';
   }
-  TRY(rmdir, state->sockinfo.sun_path);
+  WARN_ON_FAIL(rmdir, state->sockinfo.sun_path);
 
   return res;
 }
@@ -246,6 +251,9 @@ int voyeur_exec(voyeur_context_t ctx,
                 char* const envp[])
 {
   char** voyeur_envp = voyeur_prepare(ctx, envp);
+  if (!voyeur_envp) {
+    return -1;
+  }
   
   pid_t child_pid;
   if (posix_spawnp(&child_pid, path, NULL, NULL, argv, voyeur_envp) != 0) {

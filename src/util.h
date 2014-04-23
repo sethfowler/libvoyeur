@@ -3,7 +3,23 @@
 
 #include <stdio.h>
 
-#define TRY(_f, ...)                            \
+#define RETURN_ON_FAIL(_f, ...)                 \
+  do {                                          \
+    if (_f(__VA_ARGS__) < 0) {                  \
+      perror(#_f);                              \
+      return;                                   \
+    }                                           \
+  } while (0)
+
+#define RETURN_ERROR_ON_FAIL(_f, ...)           \
+  do {                                          \
+    if (_f(__VA_ARGS__) < 0) {                  \
+      perror(#_f);                              \
+      return -1;                                \
+    }                                           \
+  } while (0)
+
+#define ABORT_ON_FAIL(_f, ...)                  \
   do {                                          \
     if (_f(__VA_ARGS__) < 0) {                  \
       perror(#_f);                              \
@@ -11,7 +27,16 @@
     }                                           \
   } while (0)
 
-#define CHECK(_var, _err)                       \
+#ifdef DEBUG
+
+#  define WARN_ON_FAIL(_f, ...)                 \
+  do {                                          \
+    if (_f(__VA_ARGS__) < 0) {                  \
+      perror(#_f);                              \
+    }                                           \
+  } while (0)
+
+#  define WARN_ON_FAIL_VALUE(_var, _err)        \
   do {                                          \
     if (_var < 0) {                             \
       perror(_err);                             \
@@ -19,6 +44,23 @@
     }                                           \
   } while (0)
 
+#  define ASSERT(_check, ...)                   \
+  do {                                          \
+    if (!(_check)) {                             \
+      fprintf(stderr, __VA_ARGS__);             \
+      exit(EXIT_FAILURE);                       \
+    }                                           \
+  } while (0)
+
+#else
+
+#  define WARN_ON_FAIL(...)
+#  define WARN_ON_FAIL_VALUE(...)
+#  define ASSERT(...)
+
+#endif
+
+#define SHOULD_NOT_REACH(...) ASSERT(-1, __VA_ARGS__)
 
 inline void voyeur_log(const char* str)
 {

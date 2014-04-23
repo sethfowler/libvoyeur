@@ -25,8 +25,9 @@ int voyeur_create_server_socket(struct sockaddr_un* sockinfo)
 
   // Start the server.
   int server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
-  TRY(bind, server_sock, (struct sockaddr*) sockinfo, sizeof(struct sockaddr_un));
-  TRY(listen, server_sock, 200);
+  RETURN_ERROR_ON_FAIL(bind, server_sock, (struct sockaddr*) sockinfo,
+                                          sizeof(struct sockaddr_un));
+  RETURN_ERROR_ON_FAIL(listen, server_sock, 200);
   //chmod(sockinfo->sun_path, 0777);
   //fchmod(server_sock, 0777);
 
@@ -212,11 +213,11 @@ int voyeur_read_string(int fd, char** val, size_t maxlen)
   if (maxlen == 0) {
     *val = malloc(len + 1);
   } else if (maxlen <= len) {
-    fprintf(stderr,
-            "libvoyeur: string buffer of size %zu is too small for string of length %zu\n",
-            maxlen,
-            len);
-    exit(EXIT_FAILURE);
+    SHOULD_NOT_REACH("libvoyeur: string buffer of size %zu "
+                     "is too small for string of length %zu\n",
+                     maxlen,
+                     len);
+    return -1;
   }
   
   if (do_read(fd, (void*) *val, len) < 0) {
