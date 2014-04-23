@@ -6,6 +6,7 @@ EXAMPLENAMES=voyeur-watch-exec voyeur-watch-open
 
 CC=clang
 CFLAGS=-I./include -g
+RPATH?=
 
 UNAME := $(shell uname -s)
 ifeq ($(UNAME), Darwin)
@@ -40,7 +41,7 @@ $(OBJECTS): build/%.o : src/%.c $(HEADERS)
 
 $(LIBS): build/lib%.$(LIBSUFFIX) : build/%.o build/net.o build/env.o build/event.o build/util.o
 ifeq ($(UNAME), Darwin)
-	$(CC) $(CFLAGS) $^ -dynamiclib -install_name $(BUILDDIR)/lib$*.$(LIBSUFFIX) -o $@
+	$(CC) $(CFLAGS) $^ -dynamiclib -install_name $(RPATH)lib$*.$(LIBSUFFIX) -o $@
 else
 	$(CC) $(CFLAGS) $^ -shared -Wl,-soname,lib$*.$(LIBSUFFIX) -o $@ -ldl
 endif
@@ -60,7 +61,7 @@ $(TESTS): build/% : test/%.c $(LIBS)
 
 $(LIBNULL): build/%.$(LIBSUFFIX) : test/%.c
 ifeq ($(UNAME), Darwin)
-	$(CC) $(CFLAGS) $^ -dynamiclib -install_name $(BUILDDIR)/$*.$(LIBSUFFIX) -o $@
+	$(CC) $(CFLAGS) $^ -dynamiclib -install_name $(RPATH)$*.$(LIBSUFFIX) -o $@
 else
 	$(CC) $(CFLAGS) $^ -shared -Wl,-soname,$*.$(LIBSUFFIX) -o $@
 endif

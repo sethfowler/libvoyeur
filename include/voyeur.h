@@ -125,6 +125,27 @@ void voyeur_observe_close(voyeur_context_t ctx,
 
 
 //////////////////////////////////////////////////
+// Other context configuration options.
+//////////////////////////////////////////////////
+
+// Set the path where libvoyeur should look for its resources.
+//
+// To inject code into child processes, libvoyeur uses a set
+// of helper dynamic libraries. By default, libvoyeur assumes
+// that those libraries are located in the same directory as
+// libvoyeur itself, which is to say in the same directory as
+// libvoyeur.so/.dylib if using dynamic linking, or in the same
+// directory as the main program if using static linking. If
+// this assumption doesn't hold, this function can be used to
+// provide the path where libvoyeur should look for these files.
+//
+// The provided path must have a trailing path separator -
+// in other words, it must end with a '/'.
+void voyeur_set_resource_path(voyeur_context_t ctx,
+                              const char* path);
+
+
+//////////////////////////////////////////////////
 // Observing processes.
 //////////////////////////////////////////////////
 

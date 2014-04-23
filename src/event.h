@@ -34,6 +34,7 @@ typedef enum {
 typedef struct {
   MAP_EVENTS
 
+  char* resource_path;
   void* server_state;
 } voyeur_context;
 

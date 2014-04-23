@@ -36,6 +36,10 @@ void voyeur_context_destroy(voyeur_context_t ctx)
 {
   voyeur_context* context = (voyeur_context*) ctx;
 
+  if (context->resource_path) {
+    free(context->resource_path);
+  }
+
   if (context->server_state) {
     server_state* state = (server_state*) context->server_state;
     free(state->env_buf);
@@ -43,6 +47,14 @@ void voyeur_context_destroy(voyeur_context_t ctx)
   }
   
   free(context);
+}
+
+void voyeur_set_resource_path(voyeur_context_t ctx,
+                              const char* path)
+{
+  voyeur_context* context = (voyeur_context*) ctx;
+  context->resource_path = calloc(1, strnlen(path, 4096));
+  strlcat(context->resource_path, path, 4096);
 }
 
 typedef struct {

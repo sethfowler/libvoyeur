@@ -191,25 +191,36 @@ static size_t compute_libs_size(size_t libdir_size)
     prev = 1;                                             \
   }                                                       \
 
-char* voyeur_requested_libs(voyeur_context* context)
+char* get_default_resource_path(voyeur_context* context, bool* did_allocate)
 {
   // We want absolute paths to the libraries, relative to the location of
   // libvoyeur. We use dladdr() to determine that location.
-  bool did_allocate = false;
+  *did_allocate = false;
   char* libdir = "./";
   Dl_info dlinfo;
+
   if (dladdr(voyeur_requested_libs, &dlinfo) && dlinfo.dli_fname) {
     // Strip the filename. It'd be great if 'dirname' could be used
     // for this, but it's not thread safe. Note that if no slash is
     // found, we just stick with "./".
     char* last_slash = strrchr(dlinfo.dli_fname, '/');
     if (last_slash) {
-      did_allocate = true;
+      *did_allocate = true;
       int len_with_slash_and_null = (last_slash - dlinfo.dli_fname) + 2;
       libdir = calloc(1, len_with_slash_and_null);
       strlcpy(libdir, dlinfo.dli_fname, len_with_slash_and_null);
     }
   }
+
+  return libdir;
+}
+
+char* voyeur_requested_libs(voyeur_context* context)
+{
+  bool did_allocate = false;
+  char* libdir = context->resource_path
+               ? context->resource_path
+               : get_default_resource_path(context, &did_allocate);
 
   size_t libs_size = compute_libs_size(strnlen(libdir, 4096));
   char* libs = calloc(1, libs_size);
