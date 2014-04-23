@@ -4,6 +4,7 @@
 
 CC?=clang
 CFLAGS?=-I./include
+PREFIX?=/usr/local/bin
 
 ifdef DEBUG
 CFLAGS+=-g
@@ -67,7 +68,7 @@ else
   endef
 endif
 
-.PHONY: default check examples clean
+.PHONY: default check examples install clean
 
 
 ###############################################################################
@@ -118,6 +119,18 @@ examples: default $(EXAMPLES)
 $(EXAMPLES): build/% : examples/%.c $(HEADERS)
 	$(make-exec)
 
+
+###############################################################################
+# Install targets
+###############################################################################
+
+install: default
+	install -c $(MAINLIB) $(MAINSTATICLIB) $(LIBS) $(PREFIX)
+
+uninstall:
+	rm $(addprefix $(PREFIX)/, $(notdir $(MAINLIB)))
+	rm $(addprefix $(PREFIX)/, $(notdir $(MAINSTATICLIB)))
+	rm $(addprefix $(PREFIX)/, $(notdir $(LIBS)))
 
 ###############################################################################
 # Utility targets
