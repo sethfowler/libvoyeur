@@ -5,7 +5,7 @@ A BSD-licensed library for observing the private behavior of a child process.
 
 Mac OS X and Linux are supported.
 
-The following calls are observable:
+The following calls are currently observable:
 
 - Process creation with `exec*`
 - File access with `open` and `close`
@@ -23,10 +23,12 @@ Just run `make`. You can check that everything built correctly with `make check`
 Usage
 =====
 
-The program doing the observing must link against `libvoyeur`. You'll need to
-ensure that the various helper libraries like `libvoyeur-exec` are in the same
-directory as `libvoyeur`.
+The program doing the observing must link against `libvoyeur`. If the various
+the various helper libraries like `libvoyeur-exec` are not in the same directory
+as `libvoyeur`, you'll need to tell the library where to find them using
+`voyeur_set_resource_path`.
 
 The public API is documented in [voyeur.h](include/voyeur.h).
 
-The [examples directory](examples/) contains some sample programs built using `libvoyeur`. You can build the examples with `make examples`.
+The [examples directory](examples/) contains some sample programs built using
+`libvoyeur`. You can build the examples with `make examples`.
