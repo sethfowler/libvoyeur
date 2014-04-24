@@ -9,10 +9,14 @@ void print_test_header(char* header)
   printf("==============================\n");
 }
 
-void print_test_footer(char result)
+void print_test_footer(char result, char expected)
 {
   printf("==============================\n");
-  printf("%s\n", result ? "PASSED" : "FAILED");
+  if (result == expected) {
+    printf("PASSED\n");
+  } else {
+    printf("FAILED: expected %c but got %c\n", expected, result);
+  }
   printf("==============================\n");
 }
 
@@ -96,7 +100,7 @@ void test_exec()
 
   print_test_header("exec");
   voyeur_exec(ctx, path, argv, envp);
-  print_test_footer(result);
+  print_test_footer(result, 1);
 
   voyeur_context_destroy(ctx);
 }
@@ -113,7 +117,7 @@ void test_exec_recursive()
 
   print_test_header("exec-recursive");
   voyeur_exec(ctx, path, argv, envp);
-  print_test_footer(result == 8);
+  print_test_footer(result, 8);
 
   voyeur_context_destroy(ctx);
 }
@@ -130,7 +134,7 @@ void test_open()
 
   print_test_header("open");
   voyeur_exec(ctx, path, argv, envp);
-  print_test_footer(result);
+  print_test_footer(result, 1);
 
   voyeur_context_destroy(ctx);
 }
@@ -148,7 +152,7 @@ void test_exec_and_open()
 
   print_test_header("exec and open");
   voyeur_exec(ctx, path, argv, envp);
-  print_test_footer(exec_result && open_result);
+  print_test_footer(exec_result + open_result, 2);
 
   voyeur_context_destroy(ctx);
 }
@@ -166,7 +170,7 @@ void test_open_and_close()
 
   print_test_header("open and close");
   voyeur_exec(ctx, path, argv, envp);
-  print_test_footer(open_result && close_result);
+  print_test_footer(open_result + close_result, 2);
 
   voyeur_context_destroy(ctx);
 }
@@ -187,9 +191,9 @@ void test_exec_variants()
   // The expected result is 11 on OS X even though there are only 10 variants
   // because 'system' spawns a 'sh' process to do the real work.
 # ifdef __APPLE__
-    print_test_footer(result == 11);
+    print_test_footer(result, 11);
 # else
-    print_test_footer(result == 10);
+    print_test_footer(result, 10);
 # endif
 
   voyeur_context_destroy(ctx);
@@ -208,7 +212,7 @@ void test_exit()
   print_test_header("exit");
   voyeur_exec(ctx, path, argv, envp);
   // You'd expect 9, but /bin/echo doesn't call _exit...
-  print_test_footer(result == 5);
+  print_test_footer(result, 5);
 
   voyeur_context_destroy(ctx);
 }
