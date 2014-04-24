@@ -1,6 +1,16 @@
 #include <stdio.h>
 #include <voyeur.h>
 
+char eq(char a, char b)
+{
+  return a == b ? 1 : 0;
+}
+
+char geq(char a, char b)
+{
+  return a >= b ? 1 : 0;
+}
+
 void print_test_header(char* header)
 {
   printf("\n");
@@ -9,10 +19,10 @@ void print_test_header(char* header)
   printf("==============================\n");
 }
 
-void print_test_footer(char result, char expected)
+void print_test_footer(char result, char (*cmp)(char, char), char expected)
 {
   printf("==============================\n");
-  if (result == expected) {
+  if (cmp(result, expected)) {
     printf("PASSED\n");
   } else {
     printf("FAILED: expected %d but got %d\n", (int) expected, (int) result);
@@ -100,7 +110,7 @@ void test_exec()
 
   print_test_header("exec");
   voyeur_exec(ctx, path, argv, envp);
-  print_test_footer(result, 1);
+  print_test_footer(result, eq, 1);
 
   voyeur_context_destroy(ctx);
 }
@@ -117,7 +127,7 @@ void test_exec_recursive()
 
   print_test_header("exec-recursive");
   voyeur_exec(ctx, path, argv, envp);
-  print_test_footer(result, 8);
+  print_test_footer(result, eq, 8);
 
   voyeur_context_destroy(ctx);
 }
@@ -134,7 +144,7 @@ void test_open()
 
   print_test_header("open");
   voyeur_exec(ctx, path, argv, envp);
-  print_test_footer(result, 1);
+  print_test_footer(result, eq, 1);
 
   voyeur_context_destroy(ctx);
 }
@@ -152,7 +162,7 @@ void test_exec_and_open()
 
   print_test_header("exec and open");
   voyeur_exec(ctx, path, argv, envp);
-  print_test_footer(exec_result + open_result, 2);
+  print_test_footer(exec_result + open_result, eq, 2);
 
   voyeur_context_destroy(ctx);
 }
@@ -170,7 +180,7 @@ void test_open_and_close()
 
   print_test_header("open and close");
   voyeur_exec(ctx, path, argv, envp);
-  print_test_footer(open_result + close_result, 2);
+  print_test_footer(open_result + close_result, geq, 2);
 
   voyeur_context_destroy(ctx);
 }
@@ -191,9 +201,9 @@ void test_exec_variants()
   // The expected result is 11 on OS X even though there are only 10 variants
   // because 'system' spawns a 'sh' process to do the real work.
 # ifdef __APPLE__
-    print_test_footer(result, 11);
+    print_test_footer(result, eq, 11);
 # else
-    print_test_footer(result, 10);
+    print_test_footer(result, eq, 10);
 # endif
 
   voyeur_context_destroy(ctx);
@@ -212,7 +222,7 @@ void test_exit()
   print_test_header("exit");
   voyeur_exec(ctx, path, argv, envp);
   // You'd expect 9, but /bin/echo doesn't call _exit...
-  print_test_footer(result, 5);
+  print_test_footer(result, eq, 5);
 
   voyeur_context_destroy(ctx);
 }
@@ -223,7 +233,7 @@ int main(int argc, char** argv)
   test_exec_recursive();
   test_open();
   test_exec_and_open();
-  //test_open_and_close();
+  test_open_and_close();
   test_exec_variants();
   test_exit();
   return 0;

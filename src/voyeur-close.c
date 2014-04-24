@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -18,12 +19,15 @@ VOYEUR_STATIC_DECLARE_NEXT(close_fptr_t, close)
 
 static pthread_mutex_t voyeur_close_mutex = PTHREAD_MUTEX_INITIALIZER;
 static char voyeur_close_initialized = 0;
+static char voyeur_close_finalized = 0;
 static uint8_t voyeur_close_opts = 0;
 static int voyeur_close_sock = 0;
 
 __attribute__((destructor)) void voyeur_cleanup_close()
 {
   pthread_mutex_lock(&voyeur_close_mutex);
+
+  voyeur_close_finalized = 1;
 
   if (voyeur_close_initialized) {
     if (voyeur_close_sock >= 0) {
@@ -40,6 +44,11 @@ __attribute__((destructor)) void voyeur_cleanup_close()
 
 int VOYEUR_FUNC(close)(int fildes)
 {
+  if (voyeur_close_finalized) {
+    // We're in the process of shutting down, so just forward to the real close.
+    return VOYEUR_CALL_NEXT(close, fildes);
+  }
+
   pthread_mutex_lock(&voyeur_close_mutex);
 
   if (!voyeur_close_initialized) {
