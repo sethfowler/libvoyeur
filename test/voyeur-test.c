@@ -16,15 +16,16 @@ void print_test_footer(char result)
   printf("==============================\n");
 }
 
-void exec_callback(const char* path,
+void exec_callback(const char* file,
                    char* const argv[],
                    char* const envp[],
+                   const char* path,
                    const char* cwd,
                    pid_t pid,
                    pid_t ppid,
                    void* userdata)
 {
-  printf("[EXEC] %s", path);
+  printf("[EXEC] %s", file);
 
   if (argv[0] != NULL) {
     for (int i = 1 ; argv[i] ; ++i)
@@ -33,6 +34,10 @@ void exec_callback(const char* path,
 
   printf(" (in %s) (pid %u) (ppid %u)\n",
          cwd ? cwd : "?", (unsigned) pid, (unsigned) ppid);
+
+  if (path) {
+    printf("  path: %s\n", path);
+  }
 
   if (envp) {
     printf("  environment:\n");

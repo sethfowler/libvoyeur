@@ -27,8 +27,8 @@
 static void handle_exec(voyeur_context* context, int fd)
 {
   // Read the path.
-  char* path;
-  RETURN_ON_FAIL(voyeur_read_string, fd, &path, 0);
+  char* file;
+  RETURN_ON_FAIL(voyeur_read_string, fd, &file, 0);
 
   // Read the arguments.
   int argc;
@@ -57,6 +57,12 @@ static void handle_exec(voyeur_context* context, int fd)
     envp[envc] = NULL;
   }
 
+  // Read the value of PATH.
+  char* path = NULL;
+  if (context->exec_opts & OBSERVE_EXEC_PATH) {
+    RETURN_ON_FAIL(voyeur_read_string, fd, &path, 0);
+  }
+
   // Read the current working directory.
   char* cwd = NULL;
   if (context->exec_opts & OBSERVE_EXEC_CWD) {
@@ -69,14 +75,14 @@ static void handle_exec(voyeur_context* context, int fd)
   RETURN_ON_FAIL(voyeur_read_pid, fd, &ppid);
 
   if (context->exec_cb) {
-    ((voyeur_exec_callback)context->exec_cb)(path, argv,
-                                             envp, cwd,
+    ((voyeur_exec_callback)context->exec_cb)(file, argv, envp,
+                                             path, cwd,
                                              pid, ppid,
                                              context->exec_userdata);
   }
 
   // Free everything.
-  free(path);
+  free(file);
 
   for (int i = 0 ; i < argc ; ++i) {
     free(argv[i]);
@@ -88,6 +94,10 @@ static void handle_exec(voyeur_context* context, int fd)
       free(envp[i]);
     }
     free(envp);
+  }
+
+  if (context->exec_opts & OBSERVE_EXEC_PATH) {
+    free(path);
   }
 
   if (context->exec_opts & OBSERVE_EXEC_CWD) {

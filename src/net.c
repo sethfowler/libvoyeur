@@ -211,7 +211,9 @@ int voyeur_read_pid(int fd, pid_t* val)
 
 int voyeur_write_string(int fd, const char* val, size_t len)
 {
-  if (len == 0) {
+  if (val == NULL) {
+    len = 0;
+  } else if (len == 0) {
     len = strnlen(val, VOYEUR_MAX_STRLEN);
   }
 

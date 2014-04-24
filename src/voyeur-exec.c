@@ -4,6 +4,7 @@
 
 #include <pthread.h>
 #include <spawn.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -51,6 +52,10 @@ static void write_exec_event(int sock, uint8_t options, const char* path,
     for (int i = 0 ; i < envc ; ++i) {
       voyeur_write_string(sock, envp[i], 0);
     }
+  }
+
+  if (options & OBSERVE_EXEC_PATH) {
+    voyeur_write_string(sock, getenv("PATH"), 0);
   }
 
   if (options & OBSERVE_EXEC_CWD) {
@@ -138,6 +143,7 @@ static uint8_t voyeur_posix_spawn_options = 0;
 static char* voyeur_posix_spawn_sockpath = NULL;
 static int voyeur_posix_spawn_sock = 0;
 VOYEUR_STATIC_DECLARE_NEXT(posix_spawn_fptr_t, posix_spawn);
+VOYEUR_STATIC_DECLARE_NEXT(posix_spawn_fptr_t, posix_spawnp);
 
 __attribute__((destructor)) void voyeur_cleanup_posix_spawn()
 {
@@ -156,15 +162,8 @@ __attribute__((destructor)) void voyeur_cleanup_posix_spawn()
   pthread_mutex_unlock(&voyeur_posix_spawn_mutex);
 }
 
-int VOYEUR_FUNC(posix_spawn)(pid_t* pid,
-                             const char* restrict path,
-                             const posix_spawn_file_actions_t* file_actions,
-                             const posix_spawnattr_t* restrict attrp,
-                             char* const argv[restrict],
-                             char* const envp[restrict])
+static void voyeur_init_posix_spawn()
 {
-  pthread_mutex_lock(&voyeur_posix_spawn_mutex);
-
   if (!voyeur_posix_spawn_initialized) {
     voyeur_posix_spawn_libs = getenv("LIBVOYEUR_LIBS");
     voyeur_posix_spawn_opts = getenv("LIBVOYEUR_OPTS");
@@ -174,8 +173,21 @@ int VOYEUR_FUNC(posix_spawn)(pid_t* pid,
     voyeur_posix_spawn_sock =
       voyeur_create_client_socket(voyeur_posix_spawn_sockpath);
     VOYEUR_LOOKUP_NEXT(posix_spawn_fptr_t, posix_spawn);
+    VOYEUR_LOOKUP_NEXT(posix_spawn_fptr_t, posix_spawnp);
     voyeur_posix_spawn_initialized = 1;
   }
+}
+
+int VOYEUR_FUNC(posix_spawn)(pid_t* pid,
+                             const char* restrict path,
+                             const posix_spawn_file_actions_t* file_actions,
+                             const posix_spawnattr_t* restrict attrp,
+                             char* const argv[restrict],
+                             char* const envp[restrict])
+{
+  pthread_mutex_lock(&voyeur_posix_spawn_mutex);
+
+  voyeur_init_posix_spawn();
 
   // Add libvoyeur-specific environment variables.
   void* buf;
@@ -216,3 +228,222 @@ int VOYEUR_FUNC(posix_spawn)(pid_t* pid,
 }
 
 VOYEUR_INTERPOSE(posix_spawn)
+
+#ifdef __linux__
+
+// On Linux we need to interpose on every exec variant separately because they
+// don't just forward the work to execve and posix_spawn like OS X's versions do.
+
+//////////////////////////////////////////////////
+// execl, execle, execv
+//////////////////////////////////////////////////
+
+static char** varargs_to_argv(const char* start, const char*** envp)
+{
+  va_list args;
+
+  // Get total number of entries.
+  unsigned length = 0;
+  va_start(args, start);
+  while (va_arg(args, const char*)) {
+    ++length;
+  }
+  va_end(args);
+
+  // Increase size to fit terminating NULL.
+  ++length;
+
+  // Create an appropriately sized array.
+  char** array = malloc(sizeof(const char*) * count);
+
+  // Copy.
+  unsigned index = 0;
+  va_start(args, start);
+  while (index < length) {
+    array[index] = va_arg(args, const char*);
+    ++index;
+  }
+
+  if (envp) {
+    // Pull out envp from one past the end of argv.
+    *envp = va_arg(args, const char**);
+  }
+
+  va_end(args);
+
+  return array;
+}
+
+
+int VOYEUR_FUNC(execl)(const char* path, const char* arg, ...)
+{
+  const char** argv = varargs_to_argv(arg, NULL);
+
+  return execve(path, argv, environ);
+}
+
+VOYEUR_INTERPOSE(execl)
+
+
+int VOYEUR_FUNC(execle)(const char* path, const char* arg, ...)
+{
+  const char** envp;
+  const char** argv = varargs_to_argv(arg, &envp);
+
+  return execve(path, argv, envp);
+}
+
+VOYEUR_INTERPOSE(execle)
+
+
+int VOYEUR_FUNC(execv)(const char* path, char* const argv[])
+{
+  return execve(path, argv, environ);
+}
+
+VOYEUR_INTERPOSE(execv)
+
+
+//////////////////////////////////////////////////
+// execlp
+//////////////////////////////////////////////////
+
+typedef int (*execlp_fptr_t)(const char*, const char* arg, ...);
+
+int VOYEUR_FUNC(execlp)(const char* path, const char* arg, ...)
+{
+  const char* libs = getenv("LIBVOYEUR_LIBS");
+  const char* opts = getenv("LIBVOYEUR_OPTS");
+  uint8_t options = voyeur_decode_options(opts, VOYEUR_EVENT_EXEC);
+  const char* sockpath = getenv("LIBVOYEUR_SOCKET");
+
+  const char** argv = varargs_to_argv(arg, NULL);
+  char** envp = environ;
+
+  int sock = voyeur_create_client_socket(sockpath);
+  if (sock >= 0) {
+    write_exec_event(sock, options, path, argv, envp, getpid(), getppid());
+    voyeur_write_msg_type(sock, VOYEUR_MSG_DONE);
+    voyeur_close_socket(sock);
+  }
+
+  void* buf;
+  char** voyeur_envp =
+    voyeur_augment_environment(envp, libs, opts, sockpath, &buf);
+
+  // Pass through the call to the real execlp.
+  VOYEUR_DECLARE_NEXT(execlp_fptr_t, execlp);
+  VOYEUR_LOOKUP_NEXT(execlp_fptr_t, execlp);
+  return VOYEUR_CALL_NEXT(execlp, path, argv, voyeur_envp);
+}
+
+VOYEUR_INTERPOSE(execlp)
+
+
+typedef int (*execvp_fptr_t)(const char*, char* const []);
+
+int VOYEUR_FUNC(execvp)(const char* path, char* const argv[])
+{
+  const char* libs = getenv("LIBVOYEUR_LIBS");
+  const char* opts = getenv("LIBVOYEUR_OPTS");
+  uint8_t options = voyeur_decode_options(opts, VOYEUR_EVENT_EXEC);
+  const char* sockpath = getenv("LIBVOYEUR_SOCKET");
+
+  char** envp = environ;
+
+  int sock = voyeur_create_client_socket(sockpath);
+  if (sock >= 0) {
+    write_exec_event(sock, options, path, argv, envp, getpid(), getppid());
+    voyeur_write_msg_type(sock, VOYEUR_MSG_DONE);
+    voyeur_close_socket(sock);
+  }
+
+  void* buf;
+  char** voyeur_envp =
+    voyeur_augment_environment(envp, libs, opts, sockpath, &buf);
+
+  // Pass through the call to the real execvp.
+  VOYEUR_DECLARE_NEXT(execvp_fptr_t, execvp);
+  VOYEUR_LOOKUP_NEXT(execvp_fptr_t, execvp);
+  return VOYEUR_CALL_NEXT(execvp, path, argv, voyeur_envp);
+}
+
+VOYEUR_INTERPOSE(execvp)
+
+
+typedef int (*execvpe_fptr_t)(const char*, char* const [], char* const []);
+
+int VOYEUR_FUNC(execvpe)(const char* path, char* const argv[], char* const envp[])
+{
+  const char* libs = getenv("LIBVOYEUR_LIBS");
+  const char* opts = getenv("LIBVOYEUR_OPTS");
+  uint8_t options = voyeur_decode_options(opts, VOYEUR_EVENT_EXEC);
+  const char* sockpath = getenv("LIBVOYEUR_SOCKET");
+
+  int sock = voyeur_create_client_socket(sockpath);
+  if (sock >= 0) {
+    write_exec_event(sock, options, path, argv, envp, getpid(), getppid());
+    voyeur_write_msg_type(sock, VOYEUR_MSG_DONE);
+    voyeur_close_socket(sock);
+  }
+
+  void* buf;
+  char** voyeur_envp =
+    voyeur_augment_environment(envp, libs, opts, sockpath, &buf);
+
+  // Pass through the call to the real execvpe.
+  VOYEUR_DECLARE_NEXT(execvpe_fptr_t, execvpe);
+  VOYEUR_LOOKUP_NEXT(execvpe_fptr_t, execvpe);
+  return VOYEUR_CALL_NEXT(execvpe, path, argv, voyeur_envp);
+}
+
+VOYEUR_INTERPOSE(execvpe)
+
+
+int VOYEUR_FUNC(posix_spawnp)(pid_t* pid,
+                              const char* restrict path,
+                              const posix_spawn_file_actions_t* file_actions,
+                              const posix_spawnattr_t* restrict attrp,
+                              char* const argv[restrict],
+                              char* const envp[restrict])
+{
+  pthread_mutex_lock(&voyeur_posix_spawn_mutex);
+
+  voyeur_init_posix_spawn();
+
+  void* buf;
+  char** voyeur_envp =
+    voyeur_augment_environment(envp,
+                               voyeur_posix_spawn_libs,
+                               voyeur_posix_spawn_opts,
+                               voyeur_posix_spawn_sockpath,
+                               &buf);
+
+  // Pass through the call to the real posix_spawnp.
+  pid_t child_pid;
+  int retval = VOYEUR_CALL_NEXT(posix_spawnp, &child_pid, path,
+                                file_actions, attrp,
+                                argv, voyeur_envp);
+
+  if (voyeur_posix_spawn_sock >= 0) {
+    write_exec_event(voyeur_posix_spawn_sock,
+                     voyeur_posix_spawn_options,
+                     path, argv, envp,
+                     child_pid, getpid());
+  }
+
+  pthread_mutex_unlock(&voyeur_posix_spawn_mutex);
+
+  free(voyeur_envp);
+  free(buf);
+
+  if (pid) {
+    *pid = child_pid;
+  }
+
+  return retval;
+}
+
+VOYEUR_INTERPOSE(posix_spawnp)
+
+#endif

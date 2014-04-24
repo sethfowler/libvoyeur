@@ -62,9 +62,10 @@ void voyeur_context_destroy(voyeur_context_t ctx);
 //////////////////////////////////////////////////
 
 // Observing exec*() calls.
-typedef void (*voyeur_exec_callback)(const char* path,
+typedef void (*voyeur_exec_callback)(const char* file,
                                      char* const argv[],
                                      char* const envp[],
+                                     const char* path,
                                      const char* cwd,
                                      pid_t pid,
                                      pid_t ppid,
@@ -73,7 +74,8 @@ typedef enum {
   OBSERVE_EXEC_DEFAULT  = 0,
   OBSERVE_EXEC_CWD      = 1 << 0,  // Include 'cwd' (working directory).
   OBSERVE_EXEC_ENV      = 1 << 1,  // Include 'envp' (environment).
-  OBSERVE_EXEC_NOACCESS = 1 << 2,  // Include exec calls for paths
+  OBSERVE_EXEC_PATH     = 1 << 2,  // Include the value of 'PATH'.
+  OBSERVE_EXEC_NOACCESS = 1 << 3,  // Include exec calls for paths
                                    // that don't exist or aren't executable.
 } voyeur_exec_options;
 void voyeur_observe_exec(voyeur_context_t ctx,
