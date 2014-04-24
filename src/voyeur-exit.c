@@ -45,18 +45,8 @@ static void write_exit_event(int status)
 //////////////////////////////////////////////////
 
 // There are a lot of variants here because none of them seem to be perfectly
-// reliable on Linux. We are still likely to miss the case where a process gets
-// signaled, unfortunately.
-
-static void voyeur_exit_handler(int status, void* unused)
-{
-  write_exit_event(status);
-}
-
-__attribute__((constructor)) void voyeur_init_exit_handler()
-{
-  on_exit(voyeur_exit_handler, 0);
-}
+// reliable, especially on Linux. We are still likely to miss the case where a
+// process gets signaled, unfortunately.
 
 typedef void (*exit_fptr_t)(int);
 
@@ -96,6 +86,8 @@ void VOYEUR_FUNC(_Exit)(int status)
 
 VOYEUR_INTERPOSE(_Exit)
 
+#ifdef __linux__
+
 void VOYEUR_FUNC(exit_group)(int status)
 {
   write_exit_event(status);
@@ -107,3 +99,15 @@ void VOYEUR_FUNC(exit_group)(int status)
 }
 
 VOYEUR_INTERPOSE(exit_group)
+
+static void voyeur_exit_handler(int status, void* unused)
+{
+  write_exit_event(status);
+}
+
+__attribute__((constructor)) void voyeur_init_exit_handler()
+{
+  on_exit(voyeur_exit_handler, 0);
+}
+
+#endif
