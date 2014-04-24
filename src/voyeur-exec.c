@@ -238,46 +238,45 @@ VOYEUR_INTERPOSE(posix_spawn)
 // execl, execle, execv
 //////////////////////////////////////////////////
 
-static char** varargs_to_argv(const char* start, const char*** envp)
+#define VARARGS_TO_ARGV(_start, _path, _argv, _envp)     \
+  do {                                                   \
+    va_list args;                                        \
+                                                         \
+    /* Get total number of entries. */                   \
+    unsigned length = 0;                                 \
+    va_start(args, (_start));                            \
+    while (va_arg(args, char*)) {                        \
+      ++length;                                          \
+    }                                                    \
+    va_end(args);                                        \
+                                                         \
+    /* Increase size to fit argv[0] and final NULL. */   \
+    length += 2;                                         \
+                                                         \
+    /* Create an appropriately sized _argv. */           \
+    _argv = malloc(sizeof(const char*) * length);        \
+    _argv[0] = (char *) _path;                           \
+                                                         \
+    /* Copy. */                                          \
+    unsigned index = 1;                                  \
+    va_start(args, (_start));                            \
+    while (index < length) {                             \
+      _argv[index] = va_arg(args, char*);                \
+      ++index;                                           \
+    }                                                    \
+                                                         \
+    /* Pull out envp from one past the end of argv. */   \
+    _envp = va_arg(args, char**);                        \
+                                                         \
+    va_end(args);                                        \
+  } while(0)
+
+
+int VOYEUR_FUNC(execl)(const char* path, const char* start, ...)
 {
-  va_list args;
-
-  // Get total number of entries.
-  unsigned length = 0;
-  va_start(args, start);
-  while (va_arg(args, const char*)) {
-    ++length;
-  }
-  va_end(args);
-
-  // Increase size to fit terminating NULL.
-  ++length;
-
-  // Create an appropriately sized array.
-  char** array = malloc(sizeof(const char*) * count);
-
-  // Copy.
-  unsigned index = 0;
-  va_start(args, start);
-  while (index < length) {
-    array[index] = va_arg(args, const char*);
-    ++index;
-  }
-
-  if (envp) {
-    // Pull out envp from one past the end of argv.
-    *envp = va_arg(args, const char**);
-  }
-
-  va_end(args);
-
-  return array;
-}
-
-
-int VOYEUR_FUNC(execl)(const char* path, const char* arg, ...)
-{
-  const char** argv = varargs_to_argv(arg, NULL);
+  char** argv;
+  char** dummy_envp;
+  VARARGS_TO_ARGV(start, path, argv, dummy_envp);
 
   return execve(path, argv, environ);
 }
@@ -285,10 +284,11 @@ int VOYEUR_FUNC(execl)(const char* path, const char* arg, ...)
 VOYEUR_INTERPOSE(execl)
 
 
-int VOYEUR_FUNC(execle)(const char* path, const char* arg, ...)
+int VOYEUR_FUNC(execle)(const char* path, const char* start, ...)
 {
-  const char** envp;
-  const char** argv = varargs_to_argv(arg, &envp);
+  char** argv;
+  char** envp;
+  VARARGS_TO_ARGV(start, path, argv, envp);
 
   return execve(path, argv, envp);
 }
@@ -305,19 +305,21 @@ VOYEUR_INTERPOSE(execv)
 
 
 //////////////////////////////////////////////////
-// execlp
+// execlp, execvp, execvpe
 //////////////////////////////////////////////////
 
-typedef int (*execlp_fptr_t)(const char*, const char* arg, ...);
+typedef int (*execvpe_fptr_t)(const char*, char* const [], char* const []);
 
-int VOYEUR_FUNC(execlp)(const char* path, const char* arg, ...)
+int VOYEUR_FUNC(execlp)(const char* path, const char* start, ...)
 {
   const char* libs = getenv("LIBVOYEUR_LIBS");
   const char* opts = getenv("LIBVOYEUR_OPTS");
   uint8_t options = voyeur_decode_options(opts, VOYEUR_EVENT_EXEC);
   const char* sockpath = getenv("LIBVOYEUR_SOCKET");
 
-  const char** argv = varargs_to_argv(arg, NULL);
+  char** argv;
+  char** dummy_envp;
+  VARARGS_TO_ARGV(start, path, argv, dummy_envp);
   char** envp = environ;
 
   int sock = voyeur_create_client_socket(sockpath);
@@ -331,16 +333,14 @@ int VOYEUR_FUNC(execlp)(const char* path, const char* arg, ...)
   char** voyeur_envp =
     voyeur_augment_environment(envp, libs, opts, sockpath, &buf);
 
-  // Pass through the call to the real execlp.
-  VOYEUR_DECLARE_NEXT(execlp_fptr_t, execlp);
-  VOYEUR_LOOKUP_NEXT(execlp_fptr_t, execlp);
-  return VOYEUR_CALL_NEXT(execlp, path, argv, voyeur_envp);
+  // Need to pass through to execvpe since we need to provide an environment.
+  VOYEUR_DECLARE_NEXT(execvpe_fptr_t, execvpe);
+  VOYEUR_LOOKUP_NEXT(execvpe_fptr_t, execvpe);
+  return VOYEUR_CALL_NEXT(execvpe, path, argv, voyeur_envp);
 }
 
 VOYEUR_INTERPOSE(execlp)
 
-
-typedef int (*execvp_fptr_t)(const char*, char* const []);
 
 int VOYEUR_FUNC(execvp)(const char* path, char* const argv[])
 {
@@ -362,16 +362,14 @@ int VOYEUR_FUNC(execvp)(const char* path, char* const argv[])
   char** voyeur_envp =
     voyeur_augment_environment(envp, libs, opts, sockpath, &buf);
 
-  // Pass through the call to the real execvp.
-  VOYEUR_DECLARE_NEXT(execvp_fptr_t, execvp);
-  VOYEUR_LOOKUP_NEXT(execvp_fptr_t, execvp);
-  return VOYEUR_CALL_NEXT(execvp, path, argv, voyeur_envp);
+  // Need to pass through to execvpe since we need to provide an environment.
+  VOYEUR_DECLARE_NEXT(execvpe_fptr_t, execvpe);
+  VOYEUR_LOOKUP_NEXT(execvpe_fptr_t, execvpe);
+  return VOYEUR_CALL_NEXT(execvpe, path, argv, voyeur_envp);
 }
 
 VOYEUR_INTERPOSE(execvp)
 
-
-typedef int (*execvpe_fptr_t)(const char*, char* const [], char* const []);
 
 int VOYEUR_FUNC(execvpe)(const char* path, char* const argv[], char* const envp[])
 {
@@ -399,6 +397,10 @@ int VOYEUR_FUNC(execvpe)(const char* path, char* const argv[], char* const envp[
 
 VOYEUR_INTERPOSE(execvpe)
 
+
+//////////////////////////////////////////////////
+// posix_spawnp
+//////////////////////////////////////////////////
 
 int VOYEUR_FUNC(posix_spawnp)(pid_t* pid,
                               const char* restrict path,

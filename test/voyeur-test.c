@@ -184,9 +184,13 @@ void test_exec_variants()
   print_test_header("exec-variants");
   voyeur_exec(ctx, path, argv, envp);
 
-  // The expected result is 11 even though there are only 10 variants
+  // The expected result is 11 on OS X even though there are only 10 variants
   // because 'system' spawns a 'sh' process to do the real work.
-  print_test_footer(result == 11);
+# ifdef __APPLE__
+    print_test_footer(result == 11);
+# else
+    print_test_footer(result == 10);
+# endif
 
   voyeur_context_destroy(ctx);
 }
