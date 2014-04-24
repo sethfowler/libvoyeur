@@ -23,6 +23,11 @@ static void write_exec_event(int sock, uint8_t options, const char* path,
                              char* const argv[], char* const envp[],
                              pid_t pid, pid_t ppid)
 {
+  if (options & OBSERVE_EXEC_SILENT) {
+    // We're just here to propagate libvoyeur instrumentation.
+    return;
+  }
+
   if (!(options & OBSERVE_EXEC_NOACCESS)) {
     // Make sure this exec() call could succeed before reporting the event.
     if (access(path, X_OK) < 0) {

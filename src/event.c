@@ -194,21 +194,12 @@ static size_t compute_libs_size(size_t libdir_size)
 {
   static char all_libs[] =
     MAP_EVENTS
-    "libvoyeur-recurse" LIB_SUFFIX
     ;
 
   return sizeof(all_libs) + VOYEUR_EVENT_MAX * libdir_size;
 }
 
 #undef ON_EVENT
-
-#define ON_EVENT(_, e)                                    \
-  if (context->e##_cb) {                                  \
-    if (prev) strlcat(libs, ":", libs_size);              \
-    strlcat(libs, libdir, libs_size);                     \
-    strlcat(libs, "libvoyeur-" #e LIB_SUFFIX, libs_size); \
-    prev = 1;                                             \
-  }                                                       \
 
 static char* get_default_resource_path(voyeur_context* context, bool* did_allocate)
 {
@@ -234,6 +225,14 @@ static char* get_default_resource_path(voyeur_context* context, bool* did_alloca
   return libdir;
 }
 
+#define ON_EVENT(_, e)                                    \
+  if (context->e##_cb) {                                  \
+    if (prev) strlcat(libs, ":", libs_size);              \
+    strlcat(libs, libdir, libs_size);                     \
+    strlcat(libs, "libvoyeur-" #e LIB_SUFFIX, libs_size); \
+    prev = 1;                                             \
+  }                                                       \
+
 char* voyeur_requested_libs(voyeur_context* context)
 {
   bool did_allocate = false;
@@ -245,15 +244,19 @@ char* voyeur_requested_libs(voyeur_context* context)
   char* libs = calloc(1, libs_size);
   char prev = 0;
   
+  // If the user isn't observing exec events, we still want to apply libvoyeur
+  // recursively, so we link in voyeur-exec in any case. (We set
+  // OBSERVE_EXEC_SILENT so they won't get any events because of this.)
+  char did_force_exec = 0;
+  if (!context->exec_cb) {
+    did_force_exec = 1;
+    context->exec_cb = &did_force_exec;  // Just a dummy value.
+  }
+
   MAP_EVENTS
 
-  // If the user isn't observing exec events, we still want to apply libvoyeur
-  // recursively, so we link in libvoyeur-recurse in that case.
-  if (!context->exec_cb) {
-    if (prev) strlcat(libs, ":", libs_size);
-    strlcat(libs, libdir, libs_size);
-    strlcat(libs, "libvoyeur-recurse" LIB_SUFFIX, libs_size);
-    prev = 1;
+  if (did_force_exec) {
+    context->exec_cb = NULL;
   }
 
   if (did_allocate) {
@@ -272,6 +275,13 @@ char* voyeur_requested_opts(voyeur_context* context)
   // VOYEUR_EVENT_MAX is one greater than the highest event number and
   // thus leaves room for a terminating null.
   char* opts = calloc(1, VOYEUR_EVENT_MAX);
+
+  // If the user isn't observing exec events, we still want to apply libvoyeur
+  // recursively, so we link in voyeur-exec in any case. (We set
+  // OBSERVE_EXEC_SILENT so they won't get any events because of this.)
+  if (!context->exec_cb) {
+    context->exec_opts = OBSERVE_EXEC_SILENT;
+  }
 
   MAP_EVENTS
 

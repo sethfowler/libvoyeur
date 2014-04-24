@@ -50,4 +50,9 @@ void voyeur_handle_event(voyeur_context* context, voyeur_event_type type, int fd
 char* voyeur_requested_libs(voyeur_context* context);
 char* voyeur_requested_opts(voyeur_context* context);
 
+// A special hidden option for the exec() handler.
+typedef enum {
+  OBSERVE_EXEC_SILENT = 1 << 4
+} voyeur_extra_exec_options;
+
 #endif
