@@ -15,7 +15,7 @@ void print_test_footer(char result, char expected)
   if (result == expected) {
     printf("PASSED\n");
   } else {
-    printf("FAILED: expected %c but got %c\n", expected, result);
+    printf("FAILED: expected %d but got %d\n", (int) expected, (int) result);
   }
   printf("==============================\n");
 }
